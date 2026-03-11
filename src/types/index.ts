@@ -2,7 +2,7 @@
 export type TimeBlock = {
   id: string
   title: string
-  startTime: number // 0〜95（0:00=0, 0:15=1, ..., 23:45=95）
+  startTime: number // 0〜287（5分刻み: 0:00=0, 0:05=1, ..., 23:55=287）
   endTime: number   // 同上（startTime < endTime）
   color: string     // 表示色（例: "#4A90D9"）
 }
@@ -36,7 +36,7 @@ export type MonthlyTodo = {
 
 // ===== アプリ設定 =====
 export type AppSettings = {
-  zoomLevel: number // スロット高さ (px/15min) 15〜60, default: 30
+  zoomLevel: number // スロット高さ (px/5min) 5〜20, default: 10
 }
 
 // ===== エクスポート用ルート =====
@@ -50,17 +50,27 @@ export type AppData = {
 }
 
 // ===== ユーティリティ =====
-export const SLOT_COUNT = 96 // 24h × 4
+export const SLOTS_PER_HOUR = 12 // 5分刻み
+export const SLOT_COUNT = 24 * SLOTS_PER_HOUR // 288
 
 export function slotToTime(slot: number): string {
-  const h = Math.floor(slot / 4)
-  const m = (slot % 4) * 15
+  const h = Math.floor(slot / SLOTS_PER_HOUR)
+  const m = (slot % SLOTS_PER_HOUR) * 5
   return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}`
 }
 
 export function timeToSlot(time: string): number {
   const [h, m] = time.split(':').map(Number)
-  return h * 4 + Math.floor(m / 15)
+  return h * SLOTS_PER_HOUR + Math.floor(m / 5)
+}
+
+/** Round time string to nearest 5 minutes */
+export function roundTo5Min(time: string): string {
+  const [h, m] = time.split(':').map(Number)
+  const rounded = Math.round(m / 5) * 5
+  const finalM = rounded === 60 ? 0 : rounded
+  const finalH = rounded === 60 ? h + 1 : h
+  return `${finalH.toString().padStart(2, '0')}:${finalM.toString().padStart(2, '0')}`
 }
 
 export function formatDate(date: Date): string {
@@ -85,5 +95,5 @@ export const DEFAULT_COLORS = [
 ]
 
 export const DEFAULT_SETTINGS: AppSettings = {
-  zoomLevel: 30,
+  zoomLevel: 10,
 }
