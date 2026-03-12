@@ -1,6 +1,6 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import type { TimeBlock } from '@/types'
-import { slotToTime, timeToSlot, DEFAULT_COLORS } from '@/types'
+import { slotToTime, timeToSlot, roundTo5Min, SLOTS_PER_HOUR, SLOT_COUNT, DEFAULT_COLORS } from '@/types'
 import {
   Dialog,
   DialogContent,
@@ -31,12 +31,31 @@ export function BlockEditor({
   onDelete,
 }: Props) {
   const isEdit = !!block
-  const [title, setTitle] = useState(block?.title ?? '')
-  const [startTime, setStartTime] = useState(slotToTime(block?.startTime ?? defaultStartSlot))
-  const [endTime, setEndTime] = useState(
-    slotToTime(block?.endTime ?? Math.min(defaultStartSlot + 4, 96)),
-  )
-  const [color, setColor] = useState(block?.color ?? DEFAULT_COLORS[0])
+  const [title, setTitle] = useState('')
+  const [startTime, setStartTime] = useState('00:00')
+  const [endTime, setEndTime] = useState('01:00')
+  const [color, setColor] = useState(DEFAULT_COLORS[0])
+
+  // Sync state when dialog opens or block/slot changes
+  useEffect(() => {
+    if (open) {
+      if (block) {
+        setTitle(block.title)
+        setStartTime(slotToTime(block.startTime))
+        setEndTime(slotToTime(block.endTime))
+        setColor(block.color)
+      } else {
+        setTitle('')
+        setStartTime(slotToTime(defaultStartSlot))
+        setEndTime(slotToTime(Math.min(defaultStartSlot + SLOTS_PER_HOUR, SLOT_COUNT)))
+        setColor(DEFAULT_COLORS[0])
+      }
+    }
+  }, [open, block, defaultStartSlot])
+
+  const handleTimeChange = (setter: (v: string) => void) => (e: React.ChangeEvent<HTMLInputElement>) => {
+    setter(roundTo5Min(e.target.value))
+  }
 
   const handleSave = () => {
     const start = timeToSlot(startTime)
@@ -85,7 +104,8 @@ export function BlockEditor({
               <Input
                 type="time"
                 value={startTime}
-                onChange={(e) => setStartTime(e.target.value)}
+                step={300}
+                onChange={handleTimeChange(setStartTime)}
               />
             </div>
             <div>
@@ -93,7 +113,8 @@ export function BlockEditor({
               <Input
                 type="time"
                 value={endTime}
-                onChange={(e) => setEndTime(e.target.value)}
+                step={300}
+                onChange={handleTimeChange(setEndTime)}
               />
             </div>
           </div>

@@ -2,8 +2,8 @@ import { useRef, useCallback } from 'react'
 import { usePinch } from '@use-gesture/react'
 import { getSettings, saveSettings } from '@/lib/storage'
 
-const MIN_ZOOM = 15
-const MAX_ZOOM = 60
+const MIN_ZOOM = 5
+const MAX_ZOOM = 20
 
 export function usePinchZoom(
   zoomLevel: number,

@@ -1,27 +1,30 @@
 import { useState, useEffect, useCallback } from 'react'
 import type { IdealSnapshot } from '@/types'
-import { getSnapshots } from '@/lib/storage'
+import { getSnapshots, saveSnapshots } from '@/lib/storage'
 
 export function useVersionHistory(date: string) {
   const [snapshots, setSnapshots] = useState<IdealSnapshot[]>([])
-  const [selectedId, setSelectedId] = useState<string | null>(null)
 
   useEffect(() => {
     setSnapshots(getSnapshots(date))
-    setSelectedId(null)
   }, [date])
 
   const refresh = useCallback(() => {
     setSnapshots(getSnapshots(date))
   }, [date])
 
-  const selectedSnapshot = snapshots.find((s) => s.id === selectedId) ?? null
+  const deleteSnapshot = useCallback(
+    (id: string) => {
+      const updated = snapshots.filter((s) => s.id !== id)
+      saveSnapshots(date, updated)
+      setSnapshots(updated)
+    },
+    [date, snapshots],
+  )
 
   return {
     snapshots,
-    selectedId,
-    selectedSnapshot,
-    setSelectedId,
     refresh,
+    deleteSnapshot,
   }
 }

@@ -1,4 +1,4 @@
-import { slotToTime, SLOT_COUNT } from '@/types'
+import { slotToTime, SLOT_COUNT, SLOTS_PER_HOUR } from '@/types'
 import type { TimeBlock } from '@/types'
 import { TimeBlockItem } from './TimeBlock'
 
@@ -7,6 +7,7 @@ type Props = {
   slotHeight: number
   onSlotTap: (slot: number) => void
   onBlockTap: (block: TimeBlock) => void
+  onBlockDragEnd?: (block: TimeBlock, newStartSlot: number) => void
   dimmed?: boolean
 }
 
@@ -19,16 +20,16 @@ export function TimeLabels({ slotHeight }: { slotHeight: number }) {
         <div
           key={h}
           className="absolute right-1 -translate-y-1/2"
-          style={{ top: `${h * 4 * slotHeight}px` }}
+          style={{ top: `${h * SLOTS_PER_HOUR * slotHeight}px` }}
         >
-          {slotToTime(h * 4)}
+          {slotToTime(h * SLOTS_PER_HOUR)}
         </div>
       ))}
     </div>
   )
 }
 
-export function TimeGrid({ blocks, slotHeight, onSlotTap, onBlockTap, dimmed }: Props) {
+export function TimeGrid({ blocks, slotHeight, onSlotTap, onBlockTap, onBlockDragEnd, dimmed }: Props) {
   const totalHeight = SLOT_COUNT * slotHeight
   const hours = Array.from({ length: 24 }, (_, i) => i)
 
@@ -42,20 +43,25 @@ export function TimeGrid({ blocks, slotHeight, onSlotTap, onBlockTap, dimmed }: 
         <div
           key={h}
           className="absolute left-0 right-0 border-t border-slate-200"
-          style={{ top: `${h * 4 * slotHeight}px` }}
+          style={{ top: `${h * SLOTS_PER_HOUR * slotHeight}px` }}
         />
       ))}
 
-      {/* Clickable slots */}
-      {Array.from({ length: SLOT_COUNT }, (_, i) => (
+      {/* Clickable hour zones */}
+      {hours.map((h) => (
         <div
-          key={i}
-          className="absolute left-0 right-0 hover:bg-slate-50 active:bg-slate-100"
+          key={h}
+          className="absolute left-0 right-0"
           style={{
-            top: `${i * slotHeight}px`,
-            height: `${slotHeight}px`,
+            top: `${h * SLOTS_PER_HOUR * slotHeight}px`,
+            height: `${SLOTS_PER_HOUR * slotHeight}px`,
           }}
-          onClick={() => onSlotTap(i)}
+          onClick={(e) => {
+            const rect = e.currentTarget.getBoundingClientRect()
+            const y = e.clientY - rect.top
+            const slotInHour = Math.floor(y / slotHeight)
+            onSlotTap(h * SLOTS_PER_HOUR + slotInHour)
+          }}
         />
       ))}
 
@@ -66,6 +72,7 @@ export function TimeGrid({ blocks, slotHeight, onSlotTap, onBlockTap, dimmed }: 
           block={block}
           slotHeight={slotHeight}
           onTap={onBlockTap}
+          onDragEnd={onBlockDragEnd}
         />
       ))}
     </div>

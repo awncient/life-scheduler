@@ -1,21 +1,20 @@
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect, useCallback } from 'react'
 import type { TimeBlock } from '@/types'
 import { SLOT_COUNT } from '@/types'
 import { useBlocks } from '@/hooks/useBlocks'
-import { useVersionHistory } from '@/hooks/useVersionHistory'
 import { usePinchZoom } from '@/hooks/usePinchZoom'
 import { getSettings } from '@/lib/storage'
 import { TimeGrid, TimeLabels } from './TimeGrid'
 import { BlockEditor } from './BlockEditor'
-import { VersionHistory } from './VersionHistory'
 import { Button } from '@/components/ui/button'
 import { History } from 'lucide-react'
 
 type Props = {
   date: string
+  onOpenHistory?: () => void
 }
 
-export function DayView({ date }: Props) {
+export function DayView({ date, onOpenHistory }: Props) {
   const {
     schedule,
     addIdealBlock,
@@ -24,16 +23,15 @@ export function DayView({ date }: Props) {
     addActualBlock,
     updateActualBlock,
     deleteActualBlock,
+    moveIdealBlock,
+    moveActualBlock,
   } = useBlocks(date)
-
-  const { snapshots, selectedId, selectedSnapshot, setSelectedId, refresh } =
-    useVersionHistory(date)
 
   const [zoomLevel, setZoomLevel] = useState(() => getSettings().zoomLevel)
   const { bind, persistZoom } = usePinchZoom(zoomLevel, setZoomLevel)
-  const slotHeight = zoomLevel // px per 15min slot
+  const slotHeight = zoomLevel
+  const [isPinching, setIsPinching] = useState(false)
 
-  const [showVersions, setShowVersions] = useState(false)
   const [editorOpen, setEditorOpen] = useState(false)
   const [editingBlock, setEditingBlock] = useState<TimeBlock | null>(null)
   const [editorSide, setEditorSide] = useState<'ideal' | 'actual'>('ideal')
@@ -41,22 +39,11 @@ export function DayView({ date }: Props) {
 
   const containerRef = useRef<HTMLDivElement>(null)
 
-  // Persist zoom on change
   useEffect(() => {
     persistZoom(zoomLevel)
   }, [zoomLevel, persistZoom])
 
-  // Refresh version history when blocks change
-  useEffect(() => {
-    refresh()
-  }, [schedule.idealBlocks, refresh])
-
-  const displayIdealBlocks = selectedSnapshot
-    ? selectedSnapshot.blocks
-    : schedule.idealBlocks
-
   const handleSlotTap = (side: 'ideal' | 'actual', slot: number) => {
-    if (selectedSnapshot) return // don't allow editing while previewing
     setEditorSide(side)
     setEditingBlock(null)
     setDefaultSlot(slot)
@@ -64,35 +51,36 @@ export function DayView({ date }: Props) {
   }
 
   const handleBlockTap = (side: 'ideal' | 'actual', block: TimeBlock) => {
-    if (selectedSnapshot) return
     setEditorSide(side)
     setEditingBlock(block)
     setDefaultSlot(block.startTime)
     setEditorOpen(true)
   }
 
+  const handleBlockDragEnd = useCallback(
+    (side: 'ideal' | 'actual', block: TimeBlock, newStartSlot: number) => {
+      if (side === 'ideal') {
+        moveIdealBlock(block.id, newStartSlot)
+      } else {
+        moveActualBlock(block.id, newStartSlot)
+      }
+    },
+    [moveIdealBlock, moveActualBlock],
+  )
+
   const handleSave = (data: Omit<TimeBlock, 'id'>) => {
-    if (editorSide === 'ideal') {
-      addIdealBlock(data)
-    } else {
-      addActualBlock(data)
-    }
+    if (editorSide === 'ideal') addIdealBlock(data)
+    else addActualBlock(data)
   }
 
   const handleUpdate = (id: string, data: Partial<TimeBlock>) => {
-    if (editorSide === 'ideal') {
-      updateIdealBlock(id, data)
-    } else {
-      updateActualBlock(id, data)
-    }
+    if (editorSide === 'ideal') updateIdealBlock(id, data)
+    else updateActualBlock(id, data)
   }
 
   const handleDelete = (id: string) => {
-    if (editorSide === 'ideal') {
-      deleteIdealBlock(id)
-    } else {
-      deleteActualBlock(id)
-    }
+    if (editorSide === 'ideal') deleteIdealBlock(id)
+    else deleteActualBlock(id)
   }
 
   const totalHeight = SLOT_COUNT * slotHeight
@@ -105,14 +93,16 @@ export function DayView({ date }: Props) {
         <div className="flex-1 text-center text-xs font-medium text-slate-600 py-2 border-r border-slate-200">
           <div className="flex items-center justify-center gap-1">
             理想
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-6 w-6"
-              onClick={() => setShowVersions(!showVersions)}
-            >
-              <History className="h-3.5 w-3.5" />
-            </Button>
+            {onOpenHistory && (
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-6 w-6"
+                onClick={onOpenHistory}
+              >
+                <History className="h-3.5 w-3.5" />
+              </Button>
+            )}
           </div>
         </div>
         <div className="flex-1 text-center text-xs font-medium text-slate-600 py-2">
@@ -120,32 +110,27 @@ export function DayView({ date }: Props) {
         </div>
       </div>
 
-      {/* Version history */}
-      {showVersions && (
-        <div className="border-b border-slate-200 bg-slate-50 py-2 px-2">
-          <VersionHistory
-            snapshots={snapshots}
-            selectedId={selectedId}
-            onSelect={setSelectedId}
-          />
-        </div>
-      )}
-
       {/* Time grids */}
       <div
         ref={containerRef}
-        className="flex-1 overflow-auto touch-none"
+        className="flex-1 overflow-auto"
+        style={{ touchAction: isPinching ? 'none' : 'auto' }}
+        onTouchStart={(e) => {
+          if (e.touches.length >= 2) setIsPinching(true)
+        }}
+        onTouchEnd={() => setIsPinching(false)}
+        onTouchCancel={() => setIsPinching(false)}
         {...bind()}
       >
         <div className="flex" style={{ height: `${totalHeight}px` }}>
           <TimeLabels slotHeight={slotHeight} />
           <div className="flex-1 border-r border-slate-200 relative">
             <TimeGrid
-              blocks={displayIdealBlocks}
+              blocks={schedule.idealBlocks}
               slotHeight={slotHeight}
               onSlotTap={(slot) => handleSlotTap('ideal', slot)}
               onBlockTap={(block) => handleBlockTap('ideal', block)}
-              dimmed={!!selectedSnapshot}
+              onBlockDragEnd={(block, newStart) => handleBlockDragEnd('ideal', block, newStart)}
             />
           </div>
           <div className="flex-1 relative">
@@ -154,12 +139,12 @@ export function DayView({ date }: Props) {
               slotHeight={slotHeight}
               onSlotTap={(slot) => handleSlotTap('actual', slot)}
               onBlockTap={(block) => handleBlockTap('actual', block)}
+              onBlockDragEnd={(block, newStart) => handleBlockDragEnd('actual', block, newStart)}
             />
           </div>
         </div>
       </div>
 
-      {/* Block editor dialog */}
       <BlockEditor
         open={editorOpen}
         onClose={() => setEditorOpen(false)}

@@ -27,7 +27,7 @@ type CalendarView = 'day' | 'week'
 type Props = {
   mode: AppMode
   setMode: (mode: AppMode) => void
-  calendarView: CalendarView
+  calendarView: CalendarView | string
   setCalendarView: (view: CalendarView) => void
   currentDate: string
   setCurrentDate: (date: string) => void
@@ -88,28 +88,32 @@ export function Header({
 
   return (
     <>
-      <header className="flex items-center justify-between px-3 py-2 bg-slate-800 text-white safe-area-top">
-        {/* Left: mode and view toggle */}
+      <header className="flex items-center justify-between px-2 py-2 bg-slate-800 text-white safe-area-top">
+        {/* Left: view toggle */}
         <div className="flex items-center gap-1">
           {mode === 'calendar' && (
-            <>
-              <Button
-                variant="ghost"
-                size="sm"
-                className={`text-xs text-white hover:bg-slate-700 ${calendarView === 'day' ? 'bg-slate-600' : ''}`}
+            <div className="flex bg-slate-700 rounded-md p-0.5">
+              <button
+                className={`px-4 py-1 text-sm rounded font-medium transition-colors ${
+                  calendarView === 'day'
+                    ? 'bg-white text-slate-800'
+                    : 'text-slate-300 hover:text-white'
+                }`}
                 onClick={() => setCalendarView('day')}
               >
                 日
-              </Button>
-              <Button
-                variant="ghost"
-                size="sm"
-                className={`text-xs text-white hover:bg-slate-700 ${calendarView === 'week' ? 'bg-slate-600' : ''}`}
+              </button>
+              <button
+                className={`px-4 py-1 text-sm rounded font-medium transition-colors ${
+                  calendarView === 'week'
+                    ? 'bg-white text-slate-800'
+                    : 'text-slate-300 hover:text-white'
+                }`}
                 onClick={() => setCalendarView('week')}
               >
                 週
-              </Button>
-            </>
+              </button>
+            </div>
           )}
         </div>
 
