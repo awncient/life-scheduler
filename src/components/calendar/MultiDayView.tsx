@@ -1,6 +1,8 @@
-import { useMemo } from 'react'
-import { formatDate, parseDate, SLOT_COUNT, SLOTS_PER_HOUR } from '@/types'
+import { useState, useEffect, useMemo, useRef } from 'react'
+import { formatDate, parseDate, SLOT_COUNT, SLOTS_PER_HOUR, DEFAULT_SETTINGS } from '@/types'
 import { getSchedule, getSettings } from '@/lib/storage'
+import { usePinchZoom } from '@/hooks/usePinchZoom'
+import { CurrentTimeIndicator } from './CurrentTimeIndicator'
 
 type Props = {
   baseDate: string
@@ -12,7 +14,6 @@ const DAY_NAMES = ['日', '月', '火', '水', '木', '金', '土']
 
 function getDates(baseDateStr: string, days: number): string[] {
   if (days === 7) {
-    // Week: start from Sunday
     const base = parseDate(baseDateStr)
     const dayOfWeek = base.getDay()
     const sunday = new Date(base)
@@ -23,7 +24,6 @@ function getDates(baseDateStr: string, days: number): string[] {
       return formatDate(d)
     })
   }
-  // 3-day: center on baseDate (yesterday, today, tomorrow)
   const base = parseDate(baseDateStr)
   return Array.from({ length: days }, (_, i) => {
     const d = new Date(base)
@@ -32,10 +32,39 @@ function getDates(baseDateStr: string, days: number): string[] {
   })
 }
 
+function loadZoomLevel(): number {
+  const stored = getSettings().zoomLevel
+  if (stored < 2 || stored > 12) return DEFAULT_SETTINGS.zoomLevel
+  return stored
+}
+
 export function MultiDayView({ baseDate, days, onSelectDate }: Props) {
   const dates = useMemo(() => getDates(baseDate, days), [baseDate, days])
   const todayStr = formatDate(new Date())
-  const slotHeight = days === 7 ? getSettings().zoomLevel / 2 : getSettings().zoomLevel / 1.5
+
+  const [zoomLevel, setZoomLevel] = useState(loadZoomLevel)
+  const { containerRef, persistZoom } = usePinchZoom(zoomLevel, setZoomLevel)
+  const scale = days === 7 ? 0.5 : 1 / 1.5
+  const slotHeight = zoomLevel * scale
+
+  const didScroll = useRef(false)
+
+  useEffect(() => {
+    persistZoom(zoomLevel)
+  }, [zoomLevel, persistZoom])
+
+  // Auto-scroll to current time on mount
+  useEffect(() => {
+    if (didScroll.current) return
+    const el = containerRef.current
+    if (!el) return
+    const now = new Date()
+    const currentSlot = now.getHours() * SLOTS_PER_HOUR + Math.floor(now.getMinutes() / 5)
+    const currentPos = currentSlot * slotHeight
+    const viewHeight = el.clientHeight
+    el.scrollTop = Math.max(0, currentPos - viewHeight / 3)
+    didScroll.current = true
+  }, [slotHeight, containerRef])
 
   return (
     <div className="flex flex-col h-full">
@@ -59,8 +88,8 @@ export function MultiDayView({ baseDate, days, onSelectDate }: Props) {
         })}
       </div>
 
-      {/* Scrollable grid */}
-      <div className="flex-1 overflow-auto">
+      {/* Scrollable grid with pinch zoom */}
+      <div ref={containerRef} className="flex-1 overflow-auto">
         <div className="flex" style={{ height: `${SLOT_COUNT * slotHeight}px` }}>
           {/* Time labels */}
           <div className="relative flex-shrink-0 w-8 text-[9px] text-slate-400">
@@ -80,6 +109,7 @@ export function MultiDayView({ baseDate, days, onSelectDate }: Props) {
             const isPast = dateStr < todayStr
             const schedule = getSchedule(dateStr)
             const blocks = isPast ? schedule.actualBlocks : schedule.idealBlocks
+            const isToday = dateStr === todayStr
 
             return (
               <div key={dateStr} className="flex-1 border-r border-slate-200 last:border-r-0 min-w-0 relative">
@@ -92,7 +122,7 @@ export function MultiDayView({ baseDate, days, onSelectDate }: Props) {
                 ))}
                 {blocks.map((block) => {
                   const top = block.startTime * slotHeight
-                  const height = (block.endTime - block.startTime) * slotHeight
+                  const height = Math.max(4, (block.endTime - block.startTime) * slotHeight - 1)
                   return (
                     <div
                       key={block.id}
@@ -109,6 +139,8 @@ export function MultiDayView({ baseDate, days, onSelectDate }: Props) {
                     </div>
                   )
                 })}
+                {/* Current time indicator */}
+                {isToday && <CurrentTimeIndicator slotHeight={slotHeight} />}
               </div>
             )
           })}

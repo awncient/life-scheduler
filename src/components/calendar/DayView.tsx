@@ -1,11 +1,12 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import type { TimeBlock } from '@/types'
-import { SLOT_COUNT, DEFAULT_SETTINGS, IDEAL_COLOR, ACTUAL_COLOR } from '@/types'
+import { SLOT_COUNT, SLOTS_PER_HOUR, DEFAULT_SETTINGS, IDEAL_COLOR, ACTUAL_COLOR, formatDate } from '@/types'
 import { useBlocks } from '@/hooks/useBlocks'
 import { usePinchZoom } from '@/hooks/usePinchZoom'
 import { getSettings } from '@/lib/storage'
 import { TimeGrid, TimeLabels } from './TimeGrid'
 import { BlockEditor } from './BlockEditor'
+import { CurrentTimeIndicator } from './CurrentTimeIndicator'
 import { Button } from '@/components/ui/button'
 import { History } from 'lucide-react'
 
@@ -42,9 +43,25 @@ export function DayView({ date, onOpenHistory }: Props) {
   const [editorSide, setEditorSide] = useState<'ideal' | 'actual'>('ideal')
   const [defaultSlot, setDefaultSlot] = useState(0)
 
+  const didScroll = useRef(false)
+  const isToday = date === formatDate(new Date())
+
   useEffect(() => {
     persistZoom(zoomLevel)
   }, [zoomLevel, persistZoom])
+
+  // Auto-scroll to current time on mount
+  useEffect(() => {
+    if (didScroll.current) return
+    const el = containerRef.current
+    if (!el) return
+    const now = new Date()
+    const currentSlot = now.getHours() * SLOTS_PER_HOUR + Math.floor(now.getMinutes() / 5)
+    const currentPos = currentSlot * slotHeight
+    const viewHeight = el.clientHeight
+    el.scrollTop = Math.max(0, currentPos - viewHeight / 3)
+    didScroll.current = true
+  }, [slotHeight, containerRef])
 
   const handleSlotTap = (side: 'ideal' | 'actual', slot: number) => {
     setEditorSide(side)
@@ -137,7 +154,7 @@ export function DayView({ date, onOpenHistory }: Props) {
         ref={containerRef}
         className="flex-1 overflow-auto"
       >
-        <div className="flex" style={{ height: `${totalHeight}px` }}>
+        <div className="flex relative" style={{ height: `${totalHeight}px` }}>
           <TimeLabels slotHeight={slotHeight} />
           <div className="flex-1 border-r border-slate-200 relative">
             <TimeGrid
@@ -148,6 +165,8 @@ export function DayView({ date, onOpenHistory }: Props) {
               onBlockDragEnd={(block, newStart) => handleBlockDragEnd('ideal', block, newStart)}
               onCopyToActual={copyToActual}
             />
+            {/* Current time indicator spans both columns */}
+            {isToday && <CurrentTimeIndicator slotHeight={slotHeight} />}
           </div>
           <div className="flex-1 relative">
             <TimeGrid
@@ -157,6 +176,7 @@ export function DayView({ date, onOpenHistory }: Props) {
               onBlockTap={(block) => handleBlockTap('actual', block)}
               onBlockDragEnd={(block, newStart) => handleBlockDragEnd('actual', block, newStart)}
             />
+            {isToday && <CurrentTimeIndicator slotHeight={slotHeight} />}
           </div>
         </div>
       </div>

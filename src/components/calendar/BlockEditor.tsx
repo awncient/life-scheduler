@@ -4,13 +4,11 @@ import { slotToTime, timeToSlot, roundTo5Min, SLOTS_PER_HOUR, SLOT_COUNT, IDEAL_
 import {
   Dialog,
   DialogContent,
-  DialogHeader,
-  DialogTitle,
   DialogDescription,
 } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Copy } from 'lucide-react'
+import { Copy, X, Trash2 } from 'lucide-react'
 
 type Props = {
   open: boolean
@@ -39,9 +37,11 @@ export function BlockEditor({
   const [title, setTitle] = useState('')
   const [startTime, setStartTime] = useState('00:00')
   const [endTime, setEndTime] = useState('01:00')
+  const [confirmDelete, setConfirmDelete] = useState(false)
 
   useEffect(() => {
     if (open) {
+      setConfirmDelete(false)
       if (block) {
         setTitle(block.title)
         setStartTime(slotToTime(block.startTime))
@@ -89,71 +89,118 @@ export function BlockEditor({
   }
 
   return (
-    <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle>{isEdit ? 'ブロック編集' : 'ブロック追加'}</DialogTitle>
-          <DialogDescription>
-            {side === 'ideal' ? '理想（予定）' : '実際（記録）'}のブロック
+    <>
+      <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
+        <DialogContent>
+          {/* Visually hidden description for accessibility */}
+          <DialogDescription className="sr-only">
+            {side === 'ideal' ? '理想（予定）' : '実際（記録）'}のブロック{isEdit ? '編集' : '追加'}
           </DialogDescription>
-        </DialogHeader>
 
-        <div className="space-y-4 mt-4">
-          <div>
-            <label className="text-sm font-medium text-slate-700">タイトル</label>
-            <Input
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              placeholder="例: 朝の勉強"
-              autoFocus
-            />
-          </div>
-
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="text-sm font-medium text-slate-700">開始</label>
-              <Input
-                type="time"
-                value={startTime}
-                step={300}
-                onChange={handleTimeChange(setStartTime)}
-              />
-            </div>
-            <div>
-              <label className="text-sm font-medium text-slate-700">終了</label>
-              <Input
-                type="time"
-                value={endTime}
-                step={300}
-                onChange={handleTimeChange(setEndTime)}
-              />
-            </div>
-          </div>
-
-          <div className="flex gap-2 pt-2">
-            <Button onClick={handleSave} className="flex-1">
-              {isEdit ? '更新' : '追加'}
-            </Button>
-            {isEdit && (
-              <Button variant="destructive" onClick={handleDelete}>
-                削除
-              </Button>
+          {/* Top bar: X left, side label center, trash right */}
+          <div className="flex items-center justify-between -mt-1 mb-3">
+            <button
+              className="rounded-sm opacity-70 hover:opacity-100 p-1"
+              onClick={onClose}
+            >
+              <X className="h-5 w-5" />
+            </button>
+            <span className="text-xs font-medium text-slate-500">
+              {side === 'ideal' ? '理想（予定）' : '実際（記録）'}
+            </span>
+            {isEdit ? (
+              <button
+                className="rounded-sm opacity-70 hover:opacity-100 text-red-500 p-1"
+                onClick={() => setConfirmDelete(true)}
+              >
+                <Trash2 className="h-5 w-5" />
+              </button>
+            ) : (
+              <div className="w-7" />
             )}
           </div>
 
-          {/* Copy to actual — only for ideal blocks in edit mode */}
-          {isEdit && side === 'ideal' && onCopyToActual && (
-            <Button
-              variant="outline"
-              className="w-full gap-2"
-              onClick={handleCopyToActual}
-            >
-              <Copy className="h-4 w-4" />
-              実際欄にコピー
-            </Button>
-          )}
-        </div>
-      </DialogContent>
-    </Dialog>
+          <div className="space-y-4">
+            <div>
+              <label className="text-sm font-medium text-slate-700">タイトル</label>
+              <Input
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+                placeholder="例: 朝の勉強"
+                autoFocus
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="text-sm font-medium text-slate-700">開始</label>
+                <Input
+                  type="time"
+                  value={startTime}
+                  step={300}
+                  onChange={handleTimeChange(setStartTime)}
+                />
+              </div>
+              <div>
+                <label className="text-sm font-medium text-slate-700">終了</label>
+                <Input
+                  type="time"
+                  value={endTime}
+                  step={300}
+                  onChange={handleTimeChange(setEndTime)}
+                />
+              </div>
+            </div>
+
+            <div className="flex gap-2 pt-2">
+              <Button onClick={handleSave} className="flex-1">
+                {isEdit ? '更新' : '追加'}
+              </Button>
+            </div>
+
+            {/* Copy to actual — only for ideal blocks in edit mode */}
+            {isEdit && side === 'ideal' && onCopyToActual && (
+              <Button
+                variant="outline"
+                className="w-full gap-2"
+                onClick={handleCopyToActual}
+              >
+                <Copy className="h-4 w-4" />
+                実際欄にコピー
+              </Button>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete confirmation dialog */}
+      <Dialog open={confirmDelete} onOpenChange={(v) => !v && setConfirmDelete(false)}>
+        <DialogContent>
+          <DialogDescription className="sr-only">削除確認</DialogDescription>
+          <div className="text-center py-2">
+            <p className="text-sm text-slate-700 mb-4">この予定を削除してもよろしいですか？</p>
+            <div className="flex gap-2">
+              <Button
+                variant="outline"
+                className="flex-1"
+                onClick={() => setConfirmDelete(false)}
+              >
+                キャンセル
+              </Button>
+              <Button
+                variant="destructive"
+                className="flex-1"
+                onClick={() => {
+                  setConfirmDelete(false)
+                  handleDelete()
+                }}
+              >
+                予定を削除
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+    </>
   )
 }

@@ -44,7 +44,7 @@ export function TimeBlockItem({ block, slotHeight, onTap, onDragEnd, onCopyToAct
   onCopyRef.current = onCopyToActual
 
   const top = block.startTime * slotHeight + dragOffset
-  const height = duration * slotHeight
+  const height = Math.max(16, duration * slotHeight - 1)
   const timeLabel = `${slotToTime(block.startTime)}–${slotToTime(block.endTime)}`
   const snap15min = slotHeight * SLOTS_PER_15MIN
 
