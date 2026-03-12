@@ -60,7 +60,9 @@ export function TimeGrid({ blocks, slotHeight, onSlotTap, onBlockTap, onBlockDra
             const rect = e.currentTarget.getBoundingClientRect()
             const y = e.clientY - rect.top
             const slotInHour = Math.floor(y / slotHeight)
-            onSlotTap(h * SLOTS_PER_HOUR + slotInHour)
+            // Snap to 15-min boundary (every 3 slots of 5min)
+            const snapped = Math.floor(slotInHour / 3) * 3
+            onSlotTap(h * SLOTS_PER_HOUR + snapped)
           }}
         />
       ))}

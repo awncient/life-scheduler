@@ -36,7 +36,7 @@ export type MonthlyTodo = {
 
 // ===== アプリ設定 =====
 export type AppSettings = {
-  zoomLevel: number // スロット高さ (px/5min) 5〜20, default: 10
+  zoomLevel: number // スロット高さ (px/5min) 2〜12, default: 5
 }
 
 // ===== エクスポート用ルート =====
@@ -95,5 +95,5 @@ export const DEFAULT_COLORS = [
 ]
 
 export const DEFAULT_SETTINGS: AppSettings = {
-  zoomLevel: 10,
+  zoomLevel: 5,
 }

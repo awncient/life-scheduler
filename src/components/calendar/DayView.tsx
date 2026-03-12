@@ -1,6 +1,6 @@
-import { useState, useRef, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import type { TimeBlock } from '@/types'
-import { SLOT_COUNT } from '@/types'
+import { SLOT_COUNT, DEFAULT_SETTINGS } from '@/types'
 import { useBlocks } from '@/hooks/useBlocks'
 import { usePinchZoom } from '@/hooks/usePinchZoom'
 import { getSettings } from '@/lib/storage'
@@ -12,6 +12,13 @@ import { History } from 'lucide-react'
 type Props = {
   date: string
   onOpenHistory?: () => void
+}
+
+function loadZoomLevel(): number {
+  const stored = getSettings().zoomLevel
+  // Guard against stale values from old slot system
+  if (stored < 2 || stored > 12) return DEFAULT_SETTINGS.zoomLevel
+  return stored
 }
 
 export function DayView({ date, onOpenHistory }: Props) {
@@ -27,17 +34,14 @@ export function DayView({ date, onOpenHistory }: Props) {
     moveActualBlock,
   } = useBlocks(date)
 
-  const [zoomLevel, setZoomLevel] = useState(() => getSettings().zoomLevel)
-  const { bind, persistZoom } = usePinchZoom(zoomLevel, setZoomLevel)
+  const [zoomLevel, setZoomLevel] = useState(loadZoomLevel)
+  const { containerRef, persistZoom } = usePinchZoom(zoomLevel, setZoomLevel)
   const slotHeight = zoomLevel
-  const [isPinching, setIsPinching] = useState(false)
 
   const [editorOpen, setEditorOpen] = useState(false)
   const [editingBlock, setEditingBlock] = useState<TimeBlock | null>(null)
   const [editorSide, setEditorSide] = useState<'ideal' | 'actual'>('ideal')
   const [defaultSlot, setDefaultSlot] = useState(0)
-
-  const containerRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     persistZoom(zoomLevel)
@@ -110,17 +114,10 @@ export function DayView({ date, onOpenHistory }: Props) {
         </div>
       </div>
 
-      {/* Time grids */}
+      {/* Time grids — normal touch scroll, pinch handled by usePinchZoom */}
       <div
         ref={containerRef}
         className="flex-1 overflow-auto"
-        style={{ touchAction: isPinching ? 'none' : 'auto' }}
-        onTouchStart={(e) => {
-          if (e.touches.length >= 2) setIsPinching(true)
-        }}
-        onTouchEnd={() => setIsPinching(false)}
-        onTouchCancel={() => setIsPinching(false)}
-        {...bind()}
       >
         <div className="flex" style={{ height: `${totalHeight}px` }}>
           <TimeLabels slotHeight={slotHeight} />
