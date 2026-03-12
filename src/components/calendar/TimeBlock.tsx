@@ -1,36 +1,49 @@
-import { useRef, useState, useCallback, useEffect } from 'react'
+import { useRef, useState, useEffect, useCallback } from 'react'
 import type { TimeBlock as TimeBlockType } from '@/types'
 import { slotToTime, SLOT_COUNT } from '@/types'
 
 const LONG_PRESS_MS = 400
-const MOVE_THRESHOLD = 8 // px — movement beyond this = scroll intent
+const MOVE_THRESHOLD = 8
 const SLOTS_PER_15MIN = 3
+const COPY_THRESHOLD_PX = 60
 
 type Props = {
   block: TimeBlockType
   slotHeight: number
   onTap: (block: TimeBlockType) => void
   onDragEnd?: (block: TimeBlockType, newStartSlot: number) => void
+  onCopyToActual?: (block: TimeBlockType) => void
 }
 
-export function TimeBlockItem({ block, slotHeight, onTap, onDragEnd }: Props) {
+export function TimeBlockItem({ block, slotHeight, onTap, onDragEnd, onCopyToActual }: Props) {
   const duration = block.endTime - block.startTime
   const [dragOffset, setDragOffset] = useState(0)
+  const [dragX, setDragX] = useState(0)
   const [isDragActive, setIsDragActive] = useState(false)
 
-  const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const pointerIdRef = useRef<number | null>(null)
+  const longPressTimer = useRef<ReturnType<typeof setTimeout>>(null)
   const startY = useRef(0)
-  const fingerMoved = useRef(false)    // any movement at all (even before long-press)
-  const dragMoved = useRef(false)      // movement after drag activated
-  const gestureDecided = useRef(false) // once decided scroll/drag, don't re-decide
+  const startX = useRef(0)
+  const fingerMoved = useRef(false)
+  const dragMoved = useRef(false)
+  const dragActiveRef = useRef(false)
+  const dragOffsetRef = useRef(0)
+  const dragXRef = useRef(0)
   const elementRef = useRef<HTMLDivElement>(null)
+
+  // Keep refs for callbacks
+  const blockRef = useRef(block)
+  blockRef.current = block
+  const onTapRef = useRef(onTap)
+  onTapRef.current = onTap
+  const onDragEndRef = useRef(onDragEnd)
+  onDragEndRef.current = onDragEnd
+  const onCopyRef = useRef(onCopyToActual)
+  onCopyRef.current = onCopyToActual
 
   const top = block.startTime * slotHeight + dragOffset
   const height = duration * slotHeight
   const timeLabel = `${slotToTime(block.startTime)}–${slotToTime(block.endTime)}`
-
-  // Snap drag offset to 15-min grid
   const snap15min = slotHeight * SLOTS_PER_15MIN
 
   const cancelLongPress = useCallback(() => {
@@ -40,98 +53,129 @@ export function TimeBlockItem({ block, slotHeight, onTap, onDragEnd }: Props) {
     }
   }, [])
 
-  const handlePointerDown = useCallback((e: React.PointerEvent) => {
-    fingerMoved.current = false
-    dragMoved.current = false
-    gestureDecided.current = false
-    startY.current = e.clientY
-    pointerIdRef.current = e.pointerId
-    setDragOffset(0)
-
-    // Start long-press timer
-    longPressTimer.current = setTimeout(() => {
-      longPressTimer.current = null
-      if (!fingerMoved.current) {
-        // Long press confirmed — enter drag mode
-        gestureDecided.current = true
-        setIsDragActive(true)
-        if (elementRef.current && pointerIdRef.current !== null) {
-          try {
-            elementRef.current.setPointerCapture(pointerIdRef.current)
-          } catch {
-            // ignore if already released
-          }
-        }
-      }
-    }, LONG_PRESS_MS)
-  }, [])
-
-  const handlePointerMove = useCallback((e: React.PointerEvent) => {
-    const dy = e.clientY - startY.current
-
-    if (!isDragActive) {
-      // Before drag activated: if finger moves, it's a scroll gesture
-      if (Math.abs(dy) > MOVE_THRESHOLD) {
-        fingerMoved.current = true
-        gestureDecided.current = true
-        cancelLongPress()
-        // Don't capture — let parent scroll container handle it
-      }
-      return
-    }
-
-    // Drag mode active: snap offset to 15-min grid
-    dragMoved.current = true
-    const snappedOffset = Math.round(dy / snap15min) * snap15min
-    setDragOffset(snappedOffset)
-  }, [isDragActive, cancelLongPress, snap15min])
-
-  const handlePointerUp = useCallback(() => {
-    cancelLongPress()
-
-    if (isDragActive && dragMoved.current && onDragEnd) {
-      // Committed drag — compute new slot snapped to 15min
-      const slotDelta = Math.round(dragOffset / slotHeight)
-      const snappedDelta = Math.round(slotDelta / SLOTS_PER_15MIN) * SLOTS_PER_15MIN
-      const newStart = Math.max(0, Math.min(SLOT_COUNT - duration, block.startTime + snappedDelta))
-      onDragEnd(block, newStart)
-    } else if (!fingerMoved.current && !isDragActive) {
-      // No movement at all, quick release → tap to edit
-      onTap(block)
-    }
-    // If finger moved but drag wasn't active → scroll, do nothing
-
-    setDragOffset(0)
-    setIsDragActive(false)
-    pointerIdRef.current = null
-  }, [isDragActive, dragOffset, slotHeight, block, duration, onDragEnd, onTap, cancelLongPress])
-
-  // Cleanup timer on unmount
   useEffect(() => {
-    return () => cancelLongPress()
-  }, [cancelLongPress])
+    const el = elementRef.current
+    if (!el) return
+
+    const onTouchStart = (e: TouchEvent) => {
+      if (e.touches.length !== 1) return
+      const touch = e.touches[0]
+      fingerMoved.current = false
+      dragMoved.current = false
+      dragActiveRef.current = false
+      dragOffsetRef.current = 0
+      dragXRef.current = 0
+      startY.current = touch.clientY
+      startX.current = touch.clientX
+      setDragOffset(0)
+      setDragX(0)
+
+      longPressTimer.current = setTimeout(() => {
+        longPressTimer.current = null
+        if (!fingerMoved.current) {
+          dragActiveRef.current = true
+          setIsDragActive(true)
+        }
+      }, LONG_PRESS_MS)
+    }
+
+    const onTouchMove = (e: TouchEvent) => {
+      if (e.touches.length !== 1) return
+      const touch = e.touches[0]
+      const dy = touch.clientY - startY.current
+      const dx = touch.clientX - startX.current
+
+      if (!dragActiveRef.current) {
+        if (Math.abs(dy) > MOVE_THRESHOLD || Math.abs(dx) > MOVE_THRESHOLD) {
+          fingerMoved.current = true
+          cancelLongPress()
+        }
+        return
+      }
+
+      // Drag active — prevent scroll, update position
+      e.preventDefault()
+      e.stopPropagation()
+      dragMoved.current = true
+      const snappedY = Math.round(dy / snap15min) * snap15min
+      dragOffsetRef.current = snappedY
+      dragXRef.current = dx
+      setDragOffset(snappedY)
+      setDragX(dx)
+    }
+
+    const onTouchEnd = () => {
+      cancelLongPress()
+      const b = blockRef.current
+
+      if (dragActiveRef.current && dragMoved.current) {
+        // Check for copy-to-actual (drag right)
+        if (onCopyRef.current && dragXRef.current > COPY_THRESHOLD_PX) {
+          onCopyRef.current(b)
+        } else if (onDragEndRef.current) {
+          const slotDelta = Math.round(dragOffsetRef.current / slotHeight)
+          const snappedDelta = Math.round(slotDelta / SLOTS_PER_15MIN) * SLOTS_PER_15MIN
+          const dur = b.endTime - b.startTime
+          const newStart = Math.max(0, Math.min(SLOT_COUNT - dur, b.startTime + snappedDelta))
+          onDragEndRef.current(b, newStart)
+        }
+      } else if (!fingerMoved.current && !dragActiveRef.current) {
+        onTapRef.current(b)
+      }
+
+      dragOffsetRef.current = 0
+      dragXRef.current = 0
+      setDragOffset(0)
+      setDragX(0)
+      setIsDragActive(false)
+      dragActiveRef.current = false
+    }
+
+    el.addEventListener('touchstart', onTouchStart, { passive: true })
+    el.addEventListener('touchmove', onTouchMove, { passive: false })
+    el.addEventListener('touchend', onTouchEnd)
+    el.addEventListener('touchcancel', onTouchEnd)
+
+    return () => {
+      el.removeEventListener('touchstart', onTouchStart)
+      el.removeEventListener('touchmove', onTouchMove)
+      el.removeEventListener('touchend', onTouchEnd)
+      el.removeEventListener('touchcancel', onTouchEnd)
+      cancelLongPress()
+    }
+  }, [slotHeight, snap15min, cancelLongPress])
+
+  // Desktop: simple click
+  const handleClick = useCallback(() => {
+    onTap(block)
+  }, [block, onTap])
+
+  const showCopyHint = isDragActive && dragX > 40
 
   return (
     <div
       ref={elementRef}
-      className={`absolute left-0.5 right-0.5 rounded px-1.5 py-0.5 text-white text-xs overflow-hidden select-none ${
+      className={`absolute left-0.5 right-0.5 rounded px-1.5 py-0.5 text-xs overflow-hidden select-none ${
         isDragActive ? 'opacity-80 z-20 cursor-grabbing shadow-lg ring-2 ring-white/50' : 'cursor-pointer'
-      }`}
+      } ${showCopyHint ? 'ring-blue-400' : ''}`}
       style={{
         top: `${top}px`,
         height: `${height}px`,
         backgroundColor: block.color,
+        color: '#1e293b',
         minHeight: '16px',
-        touchAction: isDragActive ? 'none' : 'auto',
+        transform: isDragActive ? `translateX(${dragX}px)` : undefined,
       }}
-      onPointerDown={handlePointerDown}
-      onPointerMove={handlePointerMove}
-      onPointerUp={handlePointerUp}
-      onPointerCancel={handlePointerUp}
+      onClick={handleClick}
     >
       <div className="font-medium truncate leading-tight">{block.title}</div>
       {height > slotHeight * 6 && (
-        <div className="opacity-75 text-[10px] leading-tight">{timeLabel}</div>
+        <div className="opacity-60 text-[10px] leading-tight">{timeLabel}</div>
+      )}
+      {showCopyHint && (
+        <div className="absolute inset-0 flex items-center justify-center bg-black/20 rounded text-[10px] font-bold text-white">
+          実際にコピー
+        </div>
       )}
     </div>
   )

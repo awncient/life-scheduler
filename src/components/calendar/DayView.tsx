@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import type { TimeBlock } from '@/types'
-import { SLOT_COUNT, DEFAULT_SETTINGS } from '@/types'
+import { SLOT_COUNT, DEFAULT_SETTINGS, IDEAL_COLOR, ACTUAL_COLOR } from '@/types'
 import { useBlocks } from '@/hooks/useBlocks'
 import { usePinchZoom } from '@/hooks/usePinchZoom'
 import { getSettings } from '@/lib/storage'
@@ -16,7 +16,6 @@ type Props = {
 
 function loadZoomLevel(): number {
   const stored = getSettings().zoomLevel
-  // Guard against stale values from old slot system
   if (stored < 2 || stored > 12) return DEFAULT_SETTINGS.zoomLevel
   return stored
 }
@@ -72,9 +71,22 @@ export function DayView({ date, onOpenHistory }: Props) {
     [moveIdealBlock, moveActualBlock],
   )
 
+  const copyToActual = useCallback(
+    (block: TimeBlock) => {
+      addActualBlock({
+        title: block.title,
+        startTime: block.startTime,
+        endTime: block.endTime,
+        color: ACTUAL_COLOR,
+      })
+    },
+    [addActualBlock],
+  )
+
   const handleSave = (data: Omit<TimeBlock, 'id'>) => {
-    if (editorSide === 'ideal') addIdealBlock(data)
-    else addActualBlock(data)
+    const color = editorSide === 'ideal' ? IDEAL_COLOR : ACTUAL_COLOR
+    if (editorSide === 'ideal') addIdealBlock({ ...data, color })
+    else addActualBlock({ ...data, color })
   }
 
   const handleUpdate = (id: string, data: Partial<TimeBlock>) => {
@@ -96,6 +108,7 @@ export function DayView({ date, onOpenHistory }: Props) {
         <div className="w-10 flex-shrink-0" />
         <div className="flex-1 text-center text-xs font-medium text-slate-600 py-2 border-r border-slate-200">
           <div className="flex items-center justify-center gap-1">
+            <span className="inline-block w-2.5 h-2.5 rounded-sm mr-0.5" style={{ backgroundColor: IDEAL_COLOR }} />
             理想
             {onOpenHistory && (
               <Button
@@ -110,11 +123,14 @@ export function DayView({ date, onOpenHistory }: Props) {
           </div>
         </div>
         <div className="flex-1 text-center text-xs font-medium text-slate-600 py-2">
-          実際
+          <div className="flex items-center justify-center gap-1">
+            <span className="inline-block w-2.5 h-2.5 rounded-sm mr-0.5" style={{ backgroundColor: ACTUAL_COLOR }} />
+            実際
+          </div>
         </div>
       </div>
 
-      {/* Time grids — normal touch scroll, pinch handled by usePinchZoom */}
+      {/* Time grids */}
       <div
         ref={containerRef}
         className="flex-1 overflow-auto"
@@ -128,6 +144,7 @@ export function DayView({ date, onOpenHistory }: Props) {
               onSlotTap={(slot) => handleSlotTap('ideal', slot)}
               onBlockTap={(block) => handleBlockTap('ideal', block)}
               onBlockDragEnd={(block, newStart) => handleBlockDragEnd('ideal', block, newStart)}
+              onCopyToActual={copyToActual}
             />
           </div>
           <div className="flex-1 relative">
@@ -147,9 +164,11 @@ export function DayView({ date, onOpenHistory }: Props) {
         onClose={() => setEditorOpen(false)}
         block={editingBlock}
         defaultStartSlot={defaultSlot}
+        side={editorSide}
         onSave={handleSave}
         onUpdate={handleUpdate}
         onDelete={handleDelete}
+        onCopyToActual={editorSide === 'ideal' ? copyToActual : undefined}
       />
     </div>
   )

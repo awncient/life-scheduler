@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import type { TimeBlock } from '@/types'
-import { slotToTime, timeToSlot, roundTo5Min, SLOTS_PER_HOUR, SLOT_COUNT, DEFAULT_COLORS } from '@/types'
+import { slotToTime, timeToSlot, roundTo5Min, SLOTS_PER_HOUR, SLOT_COUNT, IDEAL_COLOR, ACTUAL_COLOR } from '@/types'
 import {
   Dialog,
   DialogContent,
@@ -10,15 +10,18 @@ import {
 } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { Copy } from 'lucide-react'
 
 type Props = {
   open: boolean
   onClose: () => void
   block?: TimeBlock | null
   defaultStartSlot?: number
+  side: 'ideal' | 'actual'
   onSave: (data: Omit<TimeBlock, 'id'>) => void
   onUpdate?: (id: string, data: Partial<TimeBlock>) => void
   onDelete?: (id: string) => void
+  onCopyToActual?: (block: TimeBlock) => void
 }
 
 export function BlockEditor({
@@ -26,29 +29,27 @@ export function BlockEditor({
   onClose,
   block,
   defaultStartSlot = 0,
+  side,
   onSave,
   onUpdate,
   onDelete,
+  onCopyToActual,
 }: Props) {
   const isEdit = !!block
   const [title, setTitle] = useState('')
   const [startTime, setStartTime] = useState('00:00')
   const [endTime, setEndTime] = useState('01:00')
-  const [color, setColor] = useState(DEFAULT_COLORS[0])
 
-  // Sync state when dialog opens or block/slot changes
   useEffect(() => {
     if (open) {
       if (block) {
         setTitle(block.title)
         setStartTime(slotToTime(block.startTime))
         setEndTime(slotToTime(block.endTime))
-        setColor(block.color)
       } else {
         setTitle('')
         setStartTime(slotToTime(defaultStartSlot))
         setEndTime(slotToTime(Math.min(defaultStartSlot + SLOTS_PER_HOUR, SLOT_COUNT)))
-        setColor(DEFAULT_COLORS[0])
       }
     }
   }, [open, block, defaultStartSlot])
@@ -56,6 +57,8 @@ export function BlockEditor({
   const handleTimeChange = (setter: (v: string) => void) => (e: React.ChangeEvent<HTMLInputElement>) => {
     setter(roundTo5Min(e.target.value))
   }
+
+  const color = side === 'ideal' ? IDEAL_COLOR : ACTUAL_COLOR
 
   const handleSave = () => {
     const start = timeToSlot(startTime)
@@ -77,13 +80,20 @@ export function BlockEditor({
     }
   }
 
+  const handleCopyToActual = () => {
+    if (block && onCopyToActual) {
+      onCopyToActual(block)
+      onClose()
+    }
+  }
+
   return (
     <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
       <DialogContent>
         <DialogHeader>
           <DialogTitle>{isEdit ? 'ブロック編集' : 'ブロック追加'}</DialogTitle>
           <DialogDescription>
-            {isEdit ? 'スケジュールブロックを編集します' : '新しいスケジュールブロックを追加します'}
+            {side === 'ideal' ? '理想（予定）' : '実際（記録）'}のブロック
           </DialogDescription>
         </DialogHeader>
 
@@ -119,22 +129,6 @@ export function BlockEditor({
             </div>
           </div>
 
-          <div>
-            <label className="text-sm font-medium text-slate-700">カラー</label>
-            <div className="flex gap-2 mt-1">
-              {DEFAULT_COLORS.map((c) => (
-                <button
-                  key={c}
-                  className={`w-7 h-7 rounded-full border-2 ${
-                    color === c ? 'border-slate-800 scale-110' : 'border-transparent'
-                  }`}
-                  style={{ backgroundColor: c }}
-                  onClick={() => setColor(c)}
-                />
-              ))}
-            </div>
-          </div>
-
           <div className="flex gap-2 pt-2">
             <Button onClick={handleSave} className="flex-1">
               {isEdit ? '更新' : '追加'}
@@ -145,6 +139,18 @@ export function BlockEditor({
               </Button>
             )}
           </div>
+
+          {/* Copy to actual — only for ideal blocks in edit mode */}
+          {isEdit && side === 'ideal' && onCopyToActual && (
+            <Button
+              variant="outline"
+              className="w-full gap-2"
+              onClick={handleCopyToActual}
+            >
+              <Copy className="h-4 w-4" />
+              実際欄にコピー
+            </Button>
+          )}
         </div>
       </DialogContent>
     </Dialog>

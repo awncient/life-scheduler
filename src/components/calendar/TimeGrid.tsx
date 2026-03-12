@@ -8,6 +8,7 @@ type Props = {
   onSlotTap: (slot: number) => void
   onBlockTap: (block: TimeBlock) => void
   onBlockDragEnd?: (block: TimeBlock, newStartSlot: number) => void
+  onCopyToActual?: (block: TimeBlock) => void
   dimmed?: boolean
 }
 
@@ -29,7 +30,7 @@ export function TimeLabels({ slotHeight }: { slotHeight: number }) {
   )
 }
 
-export function TimeGrid({ blocks, slotHeight, onSlotTap, onBlockTap, onBlockDragEnd, dimmed }: Props) {
+export function TimeGrid({ blocks, slotHeight, onSlotTap, onBlockTap, onBlockDragEnd, onCopyToActual, dimmed }: Props) {
   const totalHeight = SLOT_COUNT * slotHeight
   const hours = Array.from({ length: 24 }, (_, i) => i)
 
@@ -75,6 +76,7 @@ export function TimeGrid({ blocks, slotHeight, onSlotTap, onBlockTap, onBlockDra
           slotHeight={slotHeight}
           onTap={onBlockTap}
           onDragEnd={onBlockDragEnd}
+          onCopyToActual={onCopyToActual}
         />
       ))}
     </div>
