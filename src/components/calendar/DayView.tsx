@@ -72,11 +72,13 @@ export function DayView({ date, onOpenHistory }: Props) {
   )
 
   const copyToActual = useCallback(
-    (block: TimeBlock) => {
+    (block: TimeBlock, newStartSlot?: number) => {
+      const start = newStartSlot ?? block.startTime
+      const duration = block.endTime - block.startTime
       addActualBlock({
         title: block.title,
-        startTime: block.startTime,
-        endTime: block.endTime,
+        startTime: start,
+        endTime: start + duration,
         color: ACTUAL_COLOR,
       })
     },

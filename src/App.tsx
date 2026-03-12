@@ -2,12 +2,12 @@ import { useState } from 'react'
 import { formatDate } from '@/types'
 import { Header } from '@/components/layout/Header'
 import { DayView } from '@/components/calendar/DayView'
-import { WeekView } from '@/components/calendar/WeekView'
+import { MultiDayView } from '@/components/calendar/MultiDayView'
 import { VersionHistoryView } from '@/components/calendar/VersionHistory'
 import { TodoView } from '@/components/todo/TodoView'
 
 type AppMode = 'calendar' | 'todo'
-type CalendarView = 'day' | 'week' | 'history'
+type CalendarView = 'day' | 'three' | 'week' | 'history'
 
 export default function App() {
   const [mode, setMode] = useState<AppMode>('calendar')
@@ -35,9 +35,20 @@ export default function App() {
             onOpenHistory={() => setCalendarView('history')}
           />
         )}
-        {mode === 'calendar' && calendarView === 'week' && (
-          <WeekView
+        {mode === 'calendar' && calendarView === 'three' && (
+          <MultiDayView
             baseDate={currentDate}
+            days={3}
+            onSelectDate={(date) => {
+              setCurrentDate(date)
+              setCalendarView('day')
+            }}
+          />
+        )}
+        {mode === 'calendar' && calendarView === 'week' && (
+          <MultiDayView
+            baseDate={currentDate}
+            days={7}
             onSelectDate={(date) => {
               setCurrentDate(date)
               setCalendarView('day')

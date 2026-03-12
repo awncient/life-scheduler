@@ -22,7 +22,14 @@ import {
 } from 'lucide-react'
 
 type AppMode = 'calendar' | 'todo'
-type CalendarView = 'day' | 'week'
+type CalendarView = 'day' | 'three' | 'week'
+
+const VIEW_CYCLE: CalendarView[] = ['day', 'three', 'week']
+const VIEW_LABELS: Record<CalendarView, string> = {
+  day: '1日',
+  three: '3日',
+  week: '1週間',
+}
 
 type Props = {
   mode: AppMode
@@ -49,10 +56,18 @@ export function Header({
     const d = parseDate(currentDate)
     if (calendarView === 'day') {
       d.setDate(d.getDate() + delta)
+    } else if (calendarView === 'three') {
+      d.setDate(d.getDate() + delta * 3)
     } else {
       d.setDate(d.getDate() + delta * 7)
     }
     setCurrentDate(formatDate(d))
+  }
+
+  const cycleView = () => {
+    const currentIdx = VIEW_CYCLE.indexOf(calendarView as CalendarView)
+    const nextIdx = (currentIdx + 1) % VIEW_CYCLE.length
+    setCalendarView(VIEW_CYCLE[nextIdx])
   }
 
   const goToToday = () => {
@@ -80,7 +95,7 @@ export function Header({
 
   const dateLabel = (() => {
     const d = parseDate(currentDate)
-    if (calendarView === 'day') {
+    if (calendarView === 'day' || calendarView === 'three') {
       return `${d.getFullYear()}/${d.getMonth() + 1}/${d.getDate()}`
     }
     return `${d.getFullYear()}/${d.getMonth() + 1}月`
@@ -92,28 +107,12 @@ export function Header({
         {/* Left: view toggle */}
         <div className="flex items-center gap-1">
           {mode === 'calendar' && (
-            <div className="flex bg-slate-700 rounded-md p-0.5">
-              <button
-                className={`px-4 py-1 text-sm rounded font-medium transition-colors ${
-                  calendarView === 'day'
-                    ? 'bg-white text-slate-800'
-                    : 'text-slate-300 hover:text-white'
-                }`}
-                onClick={() => setCalendarView('day')}
-              >
-                日
-              </button>
-              <button
-                className={`px-4 py-1 text-sm rounded font-medium transition-colors ${
-                  calendarView === 'week'
-                    ? 'bg-white text-slate-800'
-                    : 'text-slate-300 hover:text-white'
-                }`}
-                onClick={() => setCalendarView('week')}
-              >
-                週
-              </button>
-            </div>
+            <button
+              className="px-4 py-1.5 text-sm rounded-md font-medium bg-slate-700 text-white hover:bg-slate-600 active:bg-slate-500 transition-colors min-w-[72px]"
+              onClick={cycleView}
+            >
+              {VIEW_LABELS[(calendarView as CalendarView)] ?? '1日'}
+            </button>
           )}
         </div>
 

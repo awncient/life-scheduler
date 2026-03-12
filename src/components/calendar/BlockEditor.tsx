@@ -63,12 +63,13 @@ export function BlockEditor({
   const handleSave = () => {
     const start = timeToSlot(startTime)
     const end = timeToSlot(endTime)
-    if (!title.trim() || start >= end) return
+    if (start >= end) return
+    const finalTitle = title.trim() || '（タイトルなし）'
 
     if (isEdit && onUpdate && block) {
-      onUpdate(block.id, { title: title.trim(), startTime: start, endTime: end, color })
+      onUpdate(block.id, { title: finalTitle, startTime: start, endTime: end, color })
     } else {
-      onSave({ title: title.trim(), startTime: start, endTime: end, color })
+      onSave({ title: finalTitle, startTime: start, endTime: end, color })
     }
     onClose()
   }

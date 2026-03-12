@@ -89,8 +89,8 @@ export function generateId(): string {
   return crypto.randomUUID()
 }
 
-export const IDEAL_COLOR = '#86efac' // 黄緑
-export const ACTUAL_COLOR = '#fda4af' // 桃色
+export const IDEAL_COLOR = '#22c55e' // 緑（白文字映え）
+export const ACTUAL_COLOR = '#f43f5e' // ローズ（白文字映え）
 
 export const DEFAULT_SETTINGS: AppSettings = {
   zoomLevel: 5,
