@@ -79,33 +79,27 @@ export function Header({
     return `${d.getFullYear()}/${d.getMonth() + 1}月`
   })()
 
-  const viewButtons: { key: CalendarView; label: string }[] = [
-    { key: 'day', label: '1日' },
-    { key: 'three', label: '3日' },
-    { key: 'week', label: '週' },
-  ]
+  const viewCycle: CalendarView[] = ['day', 'three', 'week']
+  const viewLabels: Record<CalendarView, string> = { day: '1日', three: '3日', week: '週' }
+
+  const cycleView = () => {
+    const idx = viewCycle.indexOf(calendarView as CalendarView)
+    const next = viewCycle[(idx + 1) % viewCycle.length]
+    setCalendarView(next)
+  }
 
   return (
     <>
       <header className="flex items-center justify-between px-2 py-2 bg-slate-800 text-white safe-area-top">
-        {/* Left: view toggle */}
+        {/* Left: view cycle button */}
         <div className="flex items-center gap-1">
           {mode === 'calendar' && (
-            <div className="flex bg-slate-700 rounded-md p-0.5">
-              {viewButtons.map(({ key, label }) => (
-                <button
-                  key={key}
-                  className={`px-3 py-1 text-sm rounded font-medium transition-colors ${
-                    calendarView === key
-                      ? 'bg-white text-slate-800'
-                      : 'text-slate-300 hover:text-white'
-                  }`}
-                  onClick={() => setCalendarView(key)}
-                >
-                  {label}
-                </button>
-              ))}
-            </div>
+            <button
+              className="px-4 py-1 text-sm rounded-md font-medium bg-slate-700 text-white active:bg-slate-600 transition-colors min-w-[48px]"
+              onClick={cycleView}
+            >
+              {viewLabels[calendarView as CalendarView] ?? '1日'}
+            </button>
           )}
         </div>
 

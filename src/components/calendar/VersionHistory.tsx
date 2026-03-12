@@ -1,13 +1,20 @@
 import { useState, useEffect, useRef } from 'react'
 import type { IdealSnapshot, TimeBlock } from '@/types'
-import { SLOT_COUNT, SLOTS_PER_HOUR } from '@/types'
-import { getSnapshots, saveSnapshots, getSchedule } from '@/lib/storage'
+import { SLOT_COUNT, SLOTS_PER_HOUR, DEFAULT_SETTINGS, slotToTime } from '@/types'
+import { getSnapshots, saveSnapshots, getSchedule, getSettings } from '@/lib/storage'
+import { usePinchZoom } from '@/hooks/usePinchZoom'
 import { Button } from '@/components/ui/button'
 import { ArrowLeft, Trash2 } from 'lucide-react'
 
 type Props = {
   date: string
   onBack: () => void
+}
+
+function loadZoomLevel(): number {
+  const stored = getSettings().zoomLevel
+  if (stored < 2 || stored > 12) return DEFAULT_SETTINGS.zoomLevel
+  return stored
 }
 
 function formatSavedAt(iso: string): string {
@@ -25,8 +32,21 @@ function blocksEqual(a: TimeBlock[], b: TimeBlock[]): boolean {
 
 export function VersionHistoryView({ date, onBack }: Props) {
   const [snapshots, setSnapshots] = useState<IdealSnapshot[]>([])
+  const [zoomLevel, setZoomLevel] = useState(loadZoomLevel)
+  const { containerRef: pinchRef, persistZoom } = usePinchZoom(zoomLevel, setZoomLevel)
   const scrollContainerRef = useRef<HTMLDivElement>(null)
-  const slotHeight = 8
+
+  // Share the ref between pinch zoom and scroll container
+  const setRefs = (el: HTMLDivElement | null) => {
+    (pinchRef as React.MutableRefObject<HTMLDivElement | null>).current = el
+    ;(scrollContainerRef as React.MutableRefObject<HTMLDivElement | null>).current = el
+  }
+
+  const slotHeight = zoomLevel * 0.5
+
+  useEffect(() => {
+    persistZoom(zoomLevel)
+  }, [zoomLevel, persistZoom])
 
   useEffect(() => {
     setSnapshots(getSnapshots(date))
@@ -96,7 +116,7 @@ export function VersionHistoryView({ date, onBack }: Props) {
         /* Scrollable area — uses two layers: sticky time labels + scrollable columns */
         <div className="flex-1 flex overflow-hidden">
           {/* Sticky time labels column */}
-          <div className="flex-shrink-0 w-8 flex flex-col">
+          <div className="flex-shrink-0 w-10 flex flex-col">
             {/* Header spacer */}
             <div className="h-[30px] border-b border-slate-200 bg-white" />
             {/* Time labels that scroll vertically with main content */}
@@ -105,10 +125,10 @@ export function VersionHistoryView({ date, onBack }: Props) {
                 {Array.from({ length: 24 }, (_, h) => (
                   <div
                     key={h}
-                    className="absolute right-0.5 -translate-y-1/2 text-[9px] text-slate-400"
+                    className="absolute right-1 -translate-y-1/2 text-[10px] text-slate-400"
                     style={{ top: `${h * SLOTS_PER_HOUR * slotHeight}px` }}
                   >
-                    {h.toString().padStart(2, '0')}
+                    {slotToTime(h * SLOTS_PER_HOUR)}
                   </div>
                 ))}
               </div>
@@ -117,7 +137,7 @@ export function VersionHistoryView({ date, onBack }: Props) {
 
           {/* Scrollable columns area */}
           <div
-            ref={scrollContainerRef}
+            ref={setRefs}
             className="flex-1 overflow-auto"
             onScroll={(e) => {
               // Sync vertical scroll with time labels
@@ -127,15 +147,15 @@ export function VersionHistoryView({ date, onBack }: Props) {
               }
             }}
           >
-            {/* Column headers */}
-            <div className="flex sticky top-0 z-10 bg-white border-b border-slate-200">
+            {/* Column headers — explicit bg on every column to prevent transparency */}
+            <div className="flex sticky top-0 z-10 border-b border-slate-200">
               {columns.map((col, idx) => {
                 const isLast = idx === columns.length - 1
                 return (
                   <div
                     key={col.id}
                     className={`flex-shrink-0 w-28 text-center text-[10px] py-1.5 border-r border-slate-200 ${
-                      isLast ? 'bg-slate-800 text-white font-bold' : 'text-slate-600'
+                      isLast ? 'bg-slate-800 text-white font-bold' : 'bg-white text-slate-600'
                     }`}
                   >
                     <div>{col.label}</div>
