@@ -11,6 +11,7 @@ export function usePinchZoom(
   const containerRef = useRef<HTMLDivElement>(null)
   const initialDistance = useRef(0)
   const initialZoom = useRef(zoomLevel)
+  const isPinching = useRef(false)
 
   useEffect(() => {
     const el = containerRef.current
@@ -19,6 +20,7 @@ export function usePinchZoom(
     const onTouchStart = (e: TouchEvent) => {
       if (e.touches.length === 2) {
         e.preventDefault()
+        isPinching.current = true
         const dx = e.touches[0].clientX - e.touches[1].clientX
         const dy = e.touches[0].clientY - e.touches[1].clientY
         initialDistance.current = Math.hypot(dx, dy)
@@ -27,21 +29,27 @@ export function usePinchZoom(
     }
 
     const onTouchMove = (e: TouchEvent) => {
-      if (e.touches.length === 2) {
+      if (e.touches.length === 2 && isPinching.current) {
         e.preventDefault()
         const dx = e.touches[0].clientX - e.touches[1].clientX
         const dy = e.touches[0].clientY - e.touches[1].clientY
         const dist = Math.hypot(dx, dy)
         if (initialDistance.current > 0) {
           const scale = dist / initialDistance.current
-          const next = Math.round(Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, initialZoom.current * scale)))
+          // Use continuous float for smooth rendering
+          const next = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, initialZoom.current * scale))
           setZoomLevel(next)
         }
       }
     }
 
     const onTouchEnd = () => {
-      initialDistance.current = 0
+      if (isPinching.current) {
+        isPinching.current = false
+        initialDistance.current = 0
+        // Snap to nearest 0.5 on release for clean grid
+        setZoomLevel(Math.round(zoomLevel * 2) / 2)
+      }
     }
 
     el.addEventListener('touchstart', onTouchStart, { passive: false })
@@ -60,7 +68,7 @@ export function usePinchZoom(
   const persistZoom = useCallback(
     (level: number) => {
       const settings = getSettings()
-      settings.zoomLevel = level
+      settings.zoomLevel = Math.round(level * 2) / 2
       saveSettings(settings)
     },
     [],
