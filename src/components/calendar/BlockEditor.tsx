@@ -37,11 +37,8 @@ export function BlockEditor({
   const [title, setTitle] = useState('')
   const [startTime, setStartTime] = useState('00:00')
   const [endTime, setEndTime] = useState('01:00')
-  const [confirmDelete, setConfirmDelete] = useState(false)
-
   useEffect(() => {
     if (open) {
-      setConfirmDelete(false)
       if (block) {
         setTitle(block.title)
         setStartTime(slotToTime(block.startTime))
@@ -75,7 +72,7 @@ export function BlockEditor({
   }
 
   const handleDelete = () => {
-    if (isEdit && onDelete && block) {
+    if (isEdit && onDelete && block && window.confirm('この予定を削除しますか？')) {
       onDelete(block.id)
       onClose()
     }
@@ -111,7 +108,7 @@ export function BlockEditor({
             {isEdit ? (
               <button
                 className="rounded-sm opacity-70 hover:opacity-100 text-red-500 p-1"
-                onClick={() => setConfirmDelete(true)}
+                onClick={handleDelete}
               >
                 <Trash2 className="h-5 w-5" />
               </button>
@@ -173,34 +170,6 @@ export function BlockEditor({
         </DialogContent>
       </Dialog>
 
-      {/* Delete confirmation dialog */}
-      <Dialog open={confirmDelete} onOpenChange={(v) => !v && setConfirmDelete(false)}>
-        <DialogContent>
-          <DialogDescription className="sr-only">削除確認</DialogDescription>
-          <div className="text-center py-2">
-            <p className="text-sm text-slate-700 mb-4">この予定を削除してもよろしいですか？</p>
-            <div className="flex gap-2">
-              <Button
-                variant="outline"
-                className="flex-1"
-                onClick={() => setConfirmDelete(false)}
-              >
-                キャンセル
-              </Button>
-              <Button
-                variant="destructive"
-                className="flex-1"
-                onClick={() => {
-                  setConfirmDelete(false)
-                  handleDelete()
-                }}
-              >
-                予定を削除
-              </Button>
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
     </>
   )
 }
