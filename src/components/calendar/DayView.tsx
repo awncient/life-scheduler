@@ -122,30 +122,26 @@ export function DayView({ date, onOpenHistory }: Props) {
 
   return (
     <div className="flex flex-col h-full">
-      {/* Column headers */}
+      {/* Column headers — fixed height for both columns */}
       <div className="flex border-b border-slate-200 bg-white sticky top-0 z-10">
         <div className="w-10 flex-shrink-0" />
-        <div className="flex-1 text-center text-xs font-medium text-slate-600 py-2 border-r border-slate-200">
-          <div className="flex items-center justify-center gap-1">
-            <span className="inline-block w-2.5 h-2.5 rounded-sm mr-0.5" style={{ backgroundColor: IDEAL_COLOR }} />
-            理想
-            {onOpenHistory && (
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-6 w-6"
-                onClick={onOpenHistory}
-              >
-                <History className="h-3.5 w-3.5" />
-              </Button>
-            )}
-          </div>
+        <div className="flex-1 flex items-center justify-center text-xs font-medium text-slate-600 py-2 border-r border-slate-200 min-h-[36px]">
+          <span className="inline-block w-2.5 h-2.5 rounded-sm mr-1" style={{ backgroundColor: IDEAL_COLOR }} />
+          理想
+          {onOpenHistory && (
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-6 w-6 ml-1"
+              onClick={onOpenHistory}
+            >
+              <History className="h-3.5 w-3.5" />
+            </Button>
+          )}
         </div>
-        <div className="flex-1 text-center text-xs font-medium text-slate-600 py-2">
-          <div className="flex items-center justify-center gap-1">
-            <span className="inline-block w-2.5 h-2.5 rounded-sm mr-0.5" style={{ backgroundColor: ACTUAL_COLOR }} />
-            実際
-          </div>
+        <div className="flex-1 flex items-center justify-center text-xs font-medium text-slate-600 py-2 min-h-[36px]">
+          <span className="inline-block w-2.5 h-2.5 rounded-sm mr-1" style={{ backgroundColor: ACTUAL_COLOR }} />
+          実際
         </div>
       </div>
 
@@ -156,26 +152,27 @@ export function DayView({ date, onOpenHistory }: Props) {
       >
         <div className="flex relative" style={{ height: `${totalHeight}px` }}>
           <TimeLabels slotHeight={slotHeight} />
-          <div className="flex-1 border-r border-slate-200 relative">
-            <TimeGrid
-              blocks={schedule.idealBlocks}
-              slotHeight={slotHeight}
-              onSlotTap={(slot) => handleSlotTap('ideal', slot)}
-              onBlockTap={(block) => handleBlockTap('ideal', block)}
-              onBlockDragEnd={(block, newStart) => handleBlockDragEnd('ideal', block, newStart)}
-              onCopyToActual={copyToActual}
-            />
-            {/* Current time indicator spans both columns */}
-            {isToday && <CurrentTimeIndicator slotHeight={slotHeight} />}
-          </div>
-          <div className="flex-1 relative">
-            <TimeGrid
-              blocks={schedule.actualBlocks}
-              slotHeight={slotHeight}
-              onSlotTap={(slot) => handleSlotTap('actual', slot)}
-              onBlockTap={(block) => handleBlockTap('actual', block)}
-              onBlockDragEnd={(block, newStart) => handleBlockDragEnd('actual', block, newStart)}
-            />
+          <div className="flex-1 flex relative">
+            <div className="flex-1 border-r border-slate-200 relative">
+              <TimeGrid
+                blocks={schedule.idealBlocks}
+                slotHeight={slotHeight}
+                onSlotTap={(slot) => handleSlotTap('ideal', slot)}
+                onBlockTap={(block) => handleBlockTap('ideal', block)}
+                onBlockDragEnd={(block, newStart) => handleBlockDragEnd('ideal', block, newStart)}
+                onCopyToActual={copyToActual}
+              />
+            </div>
+            <div className="flex-1 relative">
+              <TimeGrid
+                blocks={schedule.actualBlocks}
+                slotHeight={slotHeight}
+                onSlotTap={(slot) => handleSlotTap('actual', slot)}
+                onBlockTap={(block) => handleBlockTap('actual', block)}
+                onBlockDragEnd={(block, newStart) => handleBlockDragEnd('actual', block, newStart)}
+              />
+            </div>
+            {/* Single current time indicator spanning both columns */}
             {isToday && <CurrentTimeIndicator slotHeight={slotHeight} />}
           </div>
         </div>

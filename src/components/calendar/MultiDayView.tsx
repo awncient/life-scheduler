@@ -7,7 +7,7 @@ import { CurrentTimeIndicator } from './CurrentTimeIndicator'
 type Props = {
   baseDate: string
   days: number // 3 or 7
-  onSelectDate: (date: string) => void
+  onSelectDate?: (date: string) => void
 }
 
 const DAY_NAMES = ['日', '月', '火', '水', '木', '金', '土']
@@ -80,7 +80,7 @@ export function MultiDayView({ baseDate, days, onSelectDate }: Props) {
               className={`flex-1 text-center text-[10px] py-1.5 border-r border-slate-200 last:border-r-0 cursor-pointer active:bg-slate-100 ${
                 isToday ? 'bg-slate-800 text-white font-bold' : 'text-slate-600'
               }`}
-              onClick={() => onSelectDate(dateStr)}
+              onClick={() => onSelectDate?.(dateStr)}
             >
               {DAY_NAMES[d.getDay()]}<br />{d.getMonth() + 1}/{d.getDate()}
             </div>
@@ -133,7 +133,7 @@ export function MultiDayView({ baseDate, days, onSelectDate }: Props) {
                         backgroundColor: block.color,
                         minHeight: '4px',
                       }}
-                      onClick={() => onSelectDate(dateStr)}
+                      onClick={() => onSelectDate?.(dateStr)}
                     >
                       <div className="truncate leading-tight">{block.title}</div>
                     </div>
