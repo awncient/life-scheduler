@@ -1,13 +1,13 @@
-import { useState } from 'react'
-import { formatDate } from '@/types'
+import { useState, useCallback } from 'react'
+import { formatDate, parseDate } from '@/types'
 import { Header } from '@/components/layout/Header'
 import { DayView } from '@/components/calendar/DayView'
-import { WeekView } from '@/components/calendar/WeekView'
+import { MultiDayView } from '@/components/calendar/MultiDayView'
 import { VersionHistoryView } from '@/components/calendar/VersionHistory'
 import { TodoView } from '@/components/todo/TodoView'
 
 type AppMode = 'calendar' | 'todo'
-type CalendarView = 'day' | 'week' | 'history'
+type CalendarView = 'day' | 'three' | 'week' | 'history'
 
 export default function App() {
   const [mode, setMode] = useState<AppMode>('calendar')
@@ -15,6 +15,19 @@ export default function App() {
   const [currentDate, setCurrentDate] = useState(() => formatDate(new Date()))
 
   const showHeader = !(mode === 'calendar' && calendarView === 'history')
+
+  const navigateDate = useCallback((delta: number) => {
+    setCurrentDate(prev => {
+      const d = parseDate(prev)
+      if (calendarView === 'week') {
+        d.setDate(d.getDate() + delta * 7)
+      } else {
+        // day and three both step by 1 day
+        d.setDate(d.getDate() + delta)
+      }
+      return formatDate(d)
+    })
+  }, [calendarView])
 
   return (
     <div className="flex flex-col h-[100dvh] bg-white">
@@ -33,15 +46,29 @@ export default function App() {
           <DayView
             date={currentDate}
             onOpenHistory={() => setCalendarView('history')}
+            onNavigateDate={navigateDate}
           />
         )}
-        {mode === 'calendar' && calendarView === 'week' && (
-          <WeekView
+        {mode === 'calendar' && calendarView === 'three' && (
+          <MultiDayView
             baseDate={currentDate}
+            days={3}
             onSelectDate={(date) => {
               setCurrentDate(date)
               setCalendarView('day')
             }}
+            onNavigateDate={navigateDate}
+          />
+        )}
+        {mode === 'calendar' && calendarView === 'week' && (
+          <MultiDayView
+            baseDate={currentDate}
+            days={7}
+            onSelectDate={(date) => {
+              setCurrentDate(date)
+              setCalendarView('day')
+            }}
+            onNavigateDate={navigateDate}
           />
         )}
         {mode === 'calendar' && calendarView === 'history' && (

@@ -22,7 +22,7 @@ import {
 } from 'lucide-react'
 
 type AppMode = 'calendar' | 'todo'
-type CalendarView = 'day' | 'week'
+type CalendarView = 'day' | 'three' | 'week'
 
 type Props = {
   mode: AppMode
@@ -47,10 +47,11 @@ export function Header({
 
   const navigateDate = (delta: number) => {
     const d = parseDate(currentDate)
-    if (calendarView === 'day') {
-      d.setDate(d.getDate() + delta)
-    } else {
+    if (calendarView === 'week') {
       d.setDate(d.getDate() + delta * 7)
+    } else {
+      // day and three both step by 1 day
+      d.setDate(d.getDate() + delta)
     }
     setCurrentDate(formatDate(d))
   }
@@ -86,6 +87,12 @@ export function Header({
     return `${d.getFullYear()}/${d.getMonth() + 1}月`
   })()
 
+  const viewButtons: { key: CalendarView; label: string }[] = [
+    { key: 'day', label: '1日' },
+    { key: 'three', label: '3日' },
+    { key: 'week', label: '週' },
+  ]
+
   return (
     <>
       <header className="flex items-center justify-between px-2 py-2 bg-slate-800 text-white safe-area-top">
@@ -93,26 +100,19 @@ export function Header({
         <div className="flex items-center gap-1">
           {mode === 'calendar' && (
             <div className="flex bg-slate-700 rounded-md p-0.5">
-              <button
-                className={`px-4 py-1 text-sm rounded font-medium transition-colors ${
-                  calendarView === 'day'
-                    ? 'bg-white text-slate-800'
-                    : 'text-slate-300 hover:text-white'
-                }`}
-                onClick={() => setCalendarView('day')}
-              >
-                日
-              </button>
-              <button
-                className={`px-4 py-1 text-sm rounded font-medium transition-colors ${
-                  calendarView === 'week'
-                    ? 'bg-white text-slate-800'
-                    : 'text-slate-300 hover:text-white'
-                }`}
-                onClick={() => setCalendarView('week')}
-              >
-                週
-              </button>
+              {viewButtons.map(({ key, label }) => (
+                <button
+                  key={key}
+                  className={`px-3 py-1 text-sm rounded font-medium transition-colors ${
+                    calendarView === key
+                      ? 'bg-white text-slate-800'
+                      : 'text-slate-300 hover:text-white'
+                  }`}
+                  onClick={() => setCalendarView(key)}
+                >
+                  {label}
+                </button>
+              ))}
             </div>
           )}
         </div>
