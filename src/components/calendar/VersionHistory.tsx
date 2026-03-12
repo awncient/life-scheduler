@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import type { IdealSnapshot } from '@/types'
+import type { IdealSnapshot, TimeBlock } from '@/types'
 import { SLOT_COUNT, SLOTS_PER_HOUR } from '@/types'
 import { getSnapshots, saveSnapshots, getSchedule } from '@/lib/storage'
 import { Button } from '@/components/ui/button'
@@ -15,10 +15,18 @@ function formatSavedAt(iso: string): string {
   return `${d.getMonth() + 1}/${d.getDate()} ${d.getHours().toString().padStart(2, '0')}:${d.getMinutes().toString().padStart(2, '0')}`
 }
 
+function blocksEqual(a: TimeBlock[], b: TimeBlock[]): boolean {
+  if (a.length !== b.length) return false
+  for (let i = 0; i < a.length; i++) {
+    if (a[i].startTime !== b[i].startTime || a[i].endTime !== b[i].endTime || a[i].title !== b[i].title) return false
+  }
+  return true
+}
+
 export function VersionHistoryView({ date, onBack }: Props) {
   const [snapshots, setSnapshots] = useState<IdealSnapshot[]>([])
-  const scrollRef = useRef<HTMLDivElement>(null)
-  const slotHeight = 8 // compact for overview
+  const scrollContainerRef = useRef<HTMLDivElement>(null)
+  const slotHeight = 8
 
   useEffect(() => {
     setSnapshots(getSnapshots(date))
@@ -26,14 +34,17 @@ export function VersionHistoryView({ date, onBack }: Props) {
 
   // Scroll to right (latest) on mount
   useEffect(() => {
-    if (scrollRef.current) {
-      scrollRef.current.scrollLeft = scrollRef.current.scrollWidth
+    if (scrollContainerRef.current) {
+      scrollContainerRef.current.scrollLeft = scrollContainerRef.current.scrollWidth
     }
   }, [snapshots])
 
   const currentBlocks = getSchedule(date).idealBlocks
 
-  // All columns: snapshots + current
+  // Deduplicate: if last snapshot matches current blocks, don't show "最新" separately
+  const lastSnapshot = snapshots.length > 0 ? snapshots[snapshots.length - 1] : null
+  const showCurrent = !lastSnapshot || !blocksEqual(lastSnapshot.blocks, currentBlocks)
+
   const columns = [
     ...snapshots.map((s) => ({
       id: s.id,
@@ -41,13 +52,22 @@ export function VersionHistoryView({ date, onBack }: Props) {
       blocks: s.blocks,
       isDeletable: true,
     })),
-    {
+    ...(showCurrent ? [{
       id: '__current__',
       label: '最新',
       blocks: currentBlocks,
       isDeletable: false,
-    },
+    }] : []),
   ]
+
+  // Mark the last column as "latest" for highlighting
+  if (columns.length > 0) {
+    const last = columns[columns.length - 1]
+    if (!showCurrent && last.id !== '__current__') {
+      // The last snapshot IS the current — mark it as latest
+      columns[columns.length - 1] = { ...last, label: `${last.label}（最新）`, isDeletable: false }
+    }
+  }
 
   const handleDelete = (snapshotId: string) => {
     if (!window.confirm('この履歴を削除しますか？')) return
@@ -68,86 +88,110 @@ export function VersionHistoryView({ date, onBack }: Props) {
         <div className="text-sm font-medium">理想の履歴 — {date}</div>
       </div>
 
-      {columns.length <= 1 && snapshots.length === 0 ? (
+      {columns.length === 0 || (columns.length <= 1 && snapshots.length === 0 && !showCurrent) ? (
         <div className="flex-1 flex items-center justify-center text-sm text-slate-400">
           履歴がありません
         </div>
       ) : (
-        /* Scrollable area */
-        <div className="flex-1 overflow-auto" ref={scrollRef}>
-          {/* Column headers */}
-          <div className="flex sticky top-0 z-10 bg-white border-b border-slate-200">
-            <div className="w-8 flex-shrink-0" />
-            {columns.map((col) => (
-              <div
-                key={col.id}
-                className={`flex-shrink-0 w-28 text-center text-[10px] py-1.5 border-r border-slate-200 ${
-                  col.id === '__current__' ? 'bg-slate-800 text-white font-bold' : 'text-slate-600'
-                }`}
-              >
-                <div>{col.label}</div>
-                {col.isDeletable && (
-                  <button
-                    className="mt-0.5 text-red-400 hover:text-red-600"
-                    onClick={() => handleDelete(col.id)}
-                  >
-                    <Trash2 className="h-3 w-3 inline" />
-                  </button>
-                )}
-              </div>
-            ))}
-          </div>
-
-          {/* Grid */}
-          <div className="flex" style={{ height: `${totalHeight}px` }}>
-            {/* Time labels */}
-            <div className="relative flex-shrink-0 w-8 text-[9px] text-slate-400">
-              {Array.from({ length: 24 }, (_, h) => (
-                <div
-                  key={h}
-                  className="absolute right-0.5 -translate-y-1/2"
-                  style={{ top: `${h * SLOTS_PER_HOUR * slotHeight}px` }}
-                >
-                  {h.toString().padStart(2, '0')}
-                </div>
-              ))}
-            </div>
-
-            {/* Snapshot columns */}
-            {columns.map((col) => (
-              <div
-                key={col.id}
-                className={`flex-shrink-0 w-28 border-r border-slate-200 relative ${
-                  col.id === '__current__' ? 'bg-slate-50' : ''
-                }`}
-              >
+        /* Scrollable area — uses two layers: sticky time labels + scrollable columns */
+        <div className="flex-1 flex overflow-hidden">
+          {/* Sticky time labels column */}
+          <div className="flex-shrink-0 w-8 flex flex-col">
+            {/* Header spacer */}
+            <div className="h-[30px] border-b border-slate-200 bg-white" />
+            {/* Time labels that scroll vertically with main content */}
+            <div className="flex-1 overflow-hidden" id="time-labels-scroll">
+              <div className="relative" style={{ height: `${totalHeight}px` }}>
                 {Array.from({ length: 24 }, (_, h) => (
                   <div
                     key={h}
-                    className="absolute left-0 right-0 border-t border-slate-100"
+                    className="absolute right-0.5 -translate-y-1/2 text-[9px] text-slate-400"
                     style={{ top: `${h * SLOTS_PER_HOUR * slotHeight}px` }}
-                  />
+                  >
+                    {h.toString().padStart(2, '0')}
+                  </div>
                 ))}
-                {col.blocks.map((block) => {
-                  const top = block.startTime * slotHeight
-                  const height = (block.endTime - block.startTime) * slotHeight
-                  return (
-                    <div
-                      key={block.id}
-                      className="absolute left-0.5 right-0.5 rounded px-1 text-white text-[8px] overflow-hidden"
-                      style={{
-                        top: `${top}px`,
-                        height: `${height}px`,
-                        backgroundColor: block.color,
-                        minHeight: '4px',
-                      }}
-                    >
-                      <div className="truncate leading-tight">{block.title}</div>
-                    </div>
-                  )
-                })}
               </div>
-            ))}
+            </div>
+          </div>
+
+          {/* Scrollable columns area */}
+          <div
+            ref={scrollContainerRef}
+            className="flex-1 overflow-auto"
+            onScroll={(e) => {
+              // Sync vertical scroll with time labels
+              const labelsEl = document.getElementById('time-labels-scroll')
+              if (labelsEl) {
+                labelsEl.scrollTop = e.currentTarget.scrollTop
+              }
+            }}
+          >
+            {/* Column headers */}
+            <div className="flex sticky top-0 z-10 bg-white border-b border-slate-200">
+              {columns.map((col, idx) => {
+                const isLast = idx === columns.length - 1
+                return (
+                  <div
+                    key={col.id}
+                    className={`flex-shrink-0 w-28 text-center text-[10px] py-1.5 border-r border-slate-200 ${
+                      isLast ? 'bg-slate-800 text-white font-bold' : 'text-slate-600'
+                    }`}
+                  >
+                    <div>{col.label}</div>
+                    {col.isDeletable && (
+                      <button
+                        className="mt-0.5 text-red-400 hover:text-red-600"
+                        onClick={() => handleDelete(col.id)}
+                      >
+                        <Trash2 className="h-3 w-3 inline" />
+                      </button>
+                    )}
+                  </div>
+                )
+              })}
+            </div>
+
+            {/* Grid */}
+            <div className="flex" style={{ height: `${totalHeight}px` }}>
+              {columns.map((col, idx) => {
+                const isLast = idx === columns.length - 1
+                return (
+                  <div
+                    key={col.id}
+                    className={`flex-shrink-0 w-28 border-r border-slate-200 relative ${
+                      isLast ? 'bg-slate-50' : ''
+                    }`}
+                  >
+                    {Array.from({ length: 24 }, (_, h) => (
+                      <div
+                        key={h}
+                        className="absolute left-0 right-0 border-t border-slate-100"
+                        style={{ top: `${h * SLOTS_PER_HOUR * slotHeight}px` }}
+                      />
+                    ))}
+                    {col.blocks.map((block) => {
+                      const top = block.startTime * slotHeight
+                      const height = Math.max(4, (block.endTime - block.startTime) * slotHeight - 1)
+                      return (
+                        <div
+                          key={block.id}
+                          className="absolute left-0.5 right-0.5 rounded px-1 text-white text-[8px] overflow-hidden"
+                          style={{
+                            top: `${top}px`,
+                            height: `${height}px`,
+                            backgroundColor: block.color,
+                            minHeight: '4px',
+                          }}
+                        >
+                          <div className="truncate leading-tight">{block.title}</div>
+                        </div>
+                      )
+                    })}
+                  </div>
+                )
+              })}
+            </div>
           </div>
         </div>
       )}

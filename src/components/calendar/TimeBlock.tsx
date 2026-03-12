@@ -12,10 +12,12 @@ type Props = {
   slotHeight: number
   onTap: (block: TimeBlockType) => void
   onDragEnd?: (block: TimeBlockType, newStartSlot: number) => void
-  onCopyToActual?: (block: TimeBlockType) => void
+  onCopyToActual?: (block: TimeBlockType, newStartSlot: number) => void
+  layoutCol?: number
+  layoutTotalCols?: number
 }
 
-export function TimeBlockItem({ block, slotHeight, onTap, onDragEnd, onCopyToActual }: Props) {
+export function TimeBlockItem({ block, slotHeight, onTap, onDragEnd, onCopyToActual, layoutCol = 0, layoutTotalCols = 1 }: Props) {
   const duration = block.endTime - block.startTime
   const [dragOffset, setDragOffset] = useState(0)
   const [dragX, setDragX] = useState(0)
@@ -42,7 +44,7 @@ export function TimeBlockItem({ block, slotHeight, onTap, onDragEnd, onCopyToAct
   onCopyRef.current = onCopyToActual
 
   const top = block.startTime * slotHeight + dragOffset
-  const height = duration * slotHeight
+  const height = Math.max(16, duration * slotHeight - 1)
   const timeLabel = `${slotToTime(block.startTime)}–${slotToTime(block.endTime)}`
   const snap15min = slotHeight * SLOTS_PER_15MIN
 
@@ -111,7 +113,12 @@ export function TimeBlockItem({ block, slotHeight, onTap, onDragEnd, onCopyToAct
       if (dragActiveRef.current && dragMoved.current) {
         // Check for copy-to-actual (drag right)
         if (onCopyRef.current && dragXRef.current > COPY_THRESHOLD_PX) {
-          onCopyRef.current(b)
+          // Copy at dragged Y position, snapped to 15min
+          const slotDelta = Math.round(dragOffsetRef.current / slotHeight)
+          const snappedDelta = Math.round(slotDelta / SLOTS_PER_15MIN) * SLOTS_PER_15MIN
+          const dur = b.endTime - b.startTime
+          const newStart = Math.max(0, Math.min(SLOT_COUNT - dur, b.startTime + snappedDelta))
+          onCopyRef.current(b, newStart)
         } else if (onDragEndRef.current) {
           const slotDelta = Math.round(dragOffsetRef.current / slotHeight)
           const snappedDelta = Math.round(slotDelta / SLOTS_PER_15MIN) * SLOTS_PER_15MIN
@@ -155,16 +162,21 @@ export function TimeBlockItem({ block, slotHeight, onTap, onDragEnd, onCopyToAct
   return (
     <div
       ref={elementRef}
-      className={`absolute left-0.5 right-0.5 rounded px-1.5 py-0.5 text-xs overflow-hidden select-none ${
+      className={`absolute rounded px-1 py-0.5 text-xs overflow-hidden select-none ${
         isDragActive ? 'opacity-80 z-20 cursor-grabbing shadow-lg ring-2 ring-white/50' : 'cursor-pointer'
       } ${showCopyHint ? 'ring-blue-400' : ''}`}
       style={{
         top: `${top}px`,
         height: `${height}px`,
+        left: isDragActive ? '2px' : `${(layoutCol / layoutTotalCols) * 100}%`,
+        width: isDragActive ? 'calc(100% - 4px)' : `${(1 / layoutTotalCols) * 100}%`,
+        paddingLeft: '4px',
+        paddingRight: '2px',
         backgroundColor: block.color,
-        color: '#1e293b',
+        color: '#ffffff',
         minHeight: '16px',
         transform: isDragActive ? `translateX(${dragX}px)` : undefined,
+        zIndex: isDragActive ? 20 : layoutCol + 1,
       }}
       onClick={handleClick}
     >

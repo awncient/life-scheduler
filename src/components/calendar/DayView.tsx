@@ -7,6 +7,7 @@ import { useSwipe } from '@/hooks/useSwipe'
 import { getSettings, getSchedule } from '@/lib/storage'
 import { TimeGrid, TimeLabels } from './TimeGrid'
 import { BlockEditor } from './BlockEditor'
+import { CurrentTimeIndicator } from './CurrentTimeIndicator'
 import { Button } from '@/components/ui/button'
 import { History } from 'lucide-react'
 
@@ -99,6 +100,7 @@ export function DayView({ date, onOpenHistory, onNavigateDate }: Props) {
   const [defaultSlot, setDefaultSlot] = useState(0)
 
   const didScroll = useRef(false)
+  const isToday = date === formatDate(new Date())
 
   useEffect(() => {
     persistZoom(zoomLevel)
@@ -149,11 +151,13 @@ export function DayView({ date, onOpenHistory, onNavigateDate }: Props) {
   )
 
   const copyToActual = useCallback(
-    (block: TimeBlock) => {
+    (block: TimeBlock, newStartSlot?: number) => {
+      const start = newStartSlot ?? block.startTime
+      const duration = block.endTime - block.startTime
       addActualBlock({
         title: block.title,
-        startTime: block.startTime,
-        endTime: block.endTime,
+        startTime: start,
+        endTime: start + duration,
         color: ACTUAL_COLOR,
       })
     },
@@ -182,13 +186,15 @@ export function DayView({ date, onOpenHistory, onNavigateDate }: Props) {
   const renderReadOnlyPanel = (panelSchedule: typeof schedule) => (
     <div className="h-full flex" style={{ width: '33.333%', flexShrink: 0 }}>
       <TimeLabels slotHeight={slotHeight} />
-      <div className="flex-1 border-r border-slate-200 relative">
-        <HourLines slotHeight={slotHeight} />
-        <ReadOnlyBlocks blocks={panelSchedule.idealBlocks} slotHeight={slotHeight} />
-      </div>
-      <div className="flex-1 relative">
-        <HourLines slotHeight={slotHeight} />
-        <ReadOnlyBlocks blocks={panelSchedule.actualBlocks} slotHeight={slotHeight} />
+      <div className="flex-1 flex relative">
+        <div className="flex-1 border-r border-slate-200 relative">
+          <HourLines slotHeight={slotHeight} />
+          <ReadOnlyBlocks blocks={panelSchedule.idealBlocks} slotHeight={slotHeight} />
+        </div>
+        <div className="flex-1 relative">
+          <HourLines slotHeight={slotHeight} />
+          <ReadOnlyBlocks blocks={panelSchedule.actualBlocks} slotHeight={slotHeight} />
+        </div>
       </div>
     </div>
   )
@@ -237,24 +243,28 @@ export function DayView({ date, onOpenHistory, onNavigateDate }: Props) {
           {/* Current day (interactive) */}
           <div className="h-full flex" style={{ width: '33.333%', flexShrink: 0 }}>
             <TimeLabels slotHeight={slotHeight} />
-            <div className="flex-1 border-r border-slate-200 relative">
-              <TimeGrid
-                blocks={schedule.idealBlocks}
-                slotHeight={slotHeight}
-                onSlotTap={(slot) => handleSlotTap('ideal', slot)}
-                onBlockTap={(block) => handleBlockTap('ideal', block)}
-                onBlockDragEnd={(block, newStart) => handleBlockDragEnd('ideal', block, newStart)}
-                onCopyToActual={copyToActual}
-              />
-            </div>
-            <div className="flex-1 relative">
-              <TimeGrid
-                blocks={schedule.actualBlocks}
-                slotHeight={slotHeight}
-                onSlotTap={(slot) => handleSlotTap('actual', slot)}
-                onBlockTap={(block) => handleBlockTap('actual', block)}
-                onBlockDragEnd={(block, newStart) => handleBlockDragEnd('actual', block, newStart)}
-              />
+            <div className="flex-1 flex relative">
+              <div className="flex-1 border-r border-slate-200 relative">
+                <TimeGrid
+                  blocks={schedule.idealBlocks}
+                  slotHeight={slotHeight}
+                  onSlotTap={(slot) => handleSlotTap('ideal', slot)}
+                  onBlockTap={(block) => handleBlockTap('ideal', block)}
+                  onBlockDragEnd={(block, newStart) => handleBlockDragEnd('ideal', block, newStart)}
+                  onCopyToActual={copyToActual}
+                />
+              </div>
+              <div className="flex-1 relative">
+                <TimeGrid
+                  blocks={schedule.actualBlocks}
+                  slotHeight={slotHeight}
+                  onSlotTap={(slot) => handleSlotTap('actual', slot)}
+                  onBlockTap={(block) => handleBlockTap('actual', block)}
+                  onBlockDragEnd={(block, newStart) => handleBlockDragEnd('actual', block, newStart)}
+                />
+              </div>
+              {/* Single current time indicator spanning both columns */}
+              {isToday && <CurrentTimeIndicator slotHeight={slotHeight} />}
             </div>
           </div>
 

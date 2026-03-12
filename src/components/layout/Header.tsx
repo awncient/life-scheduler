@@ -11,8 +11,6 @@ import {
 import { SearchModal } from '@/components/calendar/SearchModal'
 import { downloadJSON, readJSONFile, importData } from '@/lib/export-import'
 import {
-  ChevronLeft,
-  ChevronRight,
   ListChecks,
   Calendar,
   Search,
@@ -33,6 +31,8 @@ type Props = {
   setCurrentDate: (date: string) => void
 }
 
+const DAY_NAMES_JP = ['日', '月', '火', '水', '木', '金', '土']
+
 export function Header({
   mode,
   setMode,
@@ -44,17 +44,6 @@ export function Header({
   const [menuOpen, setMenuOpen] = useState(false)
   const [searchOpen, setSearchOpen] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
-
-  const navigateDate = (delta: number) => {
-    const d = parseDate(currentDate)
-    if (calendarView === 'week') {
-      d.setDate(d.getDate() + delta * 7)
-    } else {
-      // day and three both step by 1 day
-      d.setDate(d.getDate() + delta)
-    }
-    setCurrentDate(formatDate(d))
-  }
 
   const goToToday = () => {
     setCurrentDate(formatDate(new Date()))
@@ -82,6 +71,9 @@ export function Header({
   const dateLabel = (() => {
     const d = parseDate(currentDate)
     if (calendarView === 'day') {
+      return `${d.getFullYear()}/${d.getMonth() + 1}/${d.getDate()}（${DAY_NAMES_JP[d.getDay()]}）`
+    }
+    if (calendarView === 'three') {
       return `${d.getFullYear()}/${d.getMonth() + 1}/${d.getDate()}`
     }
     return `${d.getFullYear()}/${d.getMonth() + 1}月`
@@ -117,22 +109,14 @@ export function Header({
           )}
         </div>
 
-        {/* Center: date navigation */}
+        {/* Center: date display (tap to go to today) */}
         {mode === 'calendar' && (
-          <div className="flex items-center gap-1">
-            <Button variant="ghost" size="icon" className="h-7 w-7 text-white hover:bg-slate-700" onClick={() => navigateDate(-1)}>
-              <ChevronLeft className="h-4 w-4" />
-            </Button>
-            <button
-              className="text-sm font-medium min-w-[100px] text-center"
-              onClick={goToToday}
-            >
-              {dateLabel}
-            </button>
-            <Button variant="ghost" size="icon" className="h-7 w-7 text-white hover:bg-slate-700" onClick={() => navigateDate(1)}>
-              <ChevronRight className="h-4 w-4" />
-            </Button>
-          </div>
+          <button
+            className="text-sm font-medium min-w-[100px] text-center"
+            onClick={goToToday}
+          >
+            {dateLabel}
+          </button>
         )}
 
         {mode === 'todo' && (

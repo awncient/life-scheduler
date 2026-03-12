@@ -1,3 +1,4 @@
+import { useMemo } from 'react'
 import { slotToTime, SLOT_COUNT, SLOTS_PER_HOUR } from '@/types'
 import type { TimeBlock } from '@/types'
 import { TimeBlockItem } from './TimeBlock'
@@ -8,8 +9,72 @@ type Props = {
   onSlotTap: (slot: number) => void
   onBlockTap: (block: TimeBlock) => void
   onBlockDragEnd?: (block: TimeBlock, newStartSlot: number) => void
-  onCopyToActual?: (block: TimeBlock) => void
+  onCopyToActual?: (block: TimeBlock, newStartSlot: number) => void
   dimmed?: boolean
+}
+
+type LayoutInfo = {
+  block: TimeBlock
+  col: number
+  totalCols: number
+}
+
+/** Compute side-by-side layout for overlapping blocks (Google Calendar style) */
+function computeLayout(blocks: TimeBlock[]): LayoutInfo[] {
+  if (blocks.length === 0) return []
+
+  // Sort by start time, then by duration (longer first)
+  const sorted = [...blocks].sort((a, b) =>
+    a.startTime !== b.startTime
+      ? a.startTime - b.startTime
+      : (b.endTime - b.startTime) - (a.endTime - a.startTime),
+  )
+
+  // Assign columns using a greedy approach
+  const colEnds: number[] = [] // tracks the end slot of each column
+  const assignments = new Map<string, { col: number; group: string[] }>()
+
+  for (const block of sorted) {
+    // Find first column where this block fits
+    let col = -1
+    for (let c = 0; c < colEnds.length; c++) {
+      if (colEnds[c] <= block.startTime) {
+        col = c
+        break
+      }
+    }
+    if (col === -1) {
+      col = colEnds.length
+      colEnds.push(0)
+    }
+    colEnds[col] = block.endTime
+    assignments.set(block.id, { col, group: [] })
+  }
+
+  // Now determine overlap groups: blocks that overlap each other share a group
+  // and should know the total columns in their group
+  const result: LayoutInfo[] = []
+
+  for (const block of sorted) {
+    const assignment = assignments.get(block.id)!
+    // Find all blocks overlapping with this one
+    let maxCol = assignment.col
+    for (const other of sorted) {
+      if (other.id === block.id) continue
+      // Check overlap
+      if (other.startTime < block.endTime && other.endTime > block.startTime) {
+        const otherAssign = assignments.get(other.id)!
+        maxCol = Math.max(maxCol, otherAssign.col)
+      }
+    }
+    result.push({
+      block,
+      col: assignment.col,
+      totalCols: maxCol + 1,
+    })
+  }
+
+  return result
 }
 
 export function TimeLabels({ slotHeight }: { slotHeight: number }) {
@@ -33,6 +98,7 @@ export function TimeLabels({ slotHeight }: { slotHeight: number }) {
 export function TimeGrid({ blocks, slotHeight, onSlotTap, onBlockTap, onBlockDragEnd, onCopyToActual, dimmed }: Props) {
   const totalHeight = SLOT_COUNT * slotHeight
   const hours = Array.from({ length: 24 }, (_, i) => i)
+  const layout = useMemo(() => computeLayout(blocks), [blocks])
 
   return (
     <div
@@ -61,15 +127,14 @@ export function TimeGrid({ blocks, slotHeight, onSlotTap, onBlockTap, onBlockDra
             const rect = e.currentTarget.getBoundingClientRect()
             const y = e.clientY - rect.top
             const slotInHour = Math.floor(y / slotHeight)
-            // Snap to 15-min boundary (every 3 slots of 5min)
             const snapped = Math.floor(slotInHour / 3) * 3
             onSlotTap(h * SLOTS_PER_HOUR + snapped)
           }}
         />
       ))}
 
-      {/* Blocks */}
-      {blocks.map((block) => (
+      {/* Blocks with overlap layout */}
+      {layout.map(({ block, col, totalCols }) => (
         <TimeBlockItem
           key={block.id}
           block={block}
@@ -77,6 +142,8 @@ export function TimeGrid({ blocks, slotHeight, onSlotTap, onBlockTap, onBlockDra
           onTap={onBlockTap}
           onDragEnd={onBlockDragEnd}
           onCopyToActual={onCopyToActual}
+          layoutCol={col}
+          layoutTotalCols={totalCols}
         />
       ))}
     </div>

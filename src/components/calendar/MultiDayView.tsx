@@ -1,7 +1,9 @@
-import { useMemo, useRef, useCallback } from 'react'
-import { formatDate, parseDate, slotToTime, SLOT_COUNT, SLOTS_PER_HOUR } from '@/types'
+import { useState, useEffect, useMemo, useRef, useCallback } from 'react'
+import { formatDate, parseDate, slotToTime, SLOT_COUNT, SLOTS_PER_HOUR, DEFAULT_SETTINGS } from '@/types'
 import { getSchedule, getSettings } from '@/lib/storage'
+import { usePinchZoom } from '@/hooks/usePinchZoom'
 import { useSwipe } from '@/hooks/useSwipe'
+import { CurrentTimeIndicator } from './CurrentTimeIndicator'
 
 type Props = {
   baseDate: string
@@ -41,6 +43,12 @@ function offsetBaseDate(baseDateStr: string, delta: number, days: number): strin
   return formatDate(d)
 }
 
+function loadZoomLevel(): number {
+  const stored = getSettings().zoomLevel
+  if (stored < 2 || stored > 12) return DEFAULT_SETTINGS.zoomLevel
+  return stored
+}
+
 function DayColumns({
   dates,
   slotHeight,
@@ -58,6 +66,7 @@ function DayColumns({
         const isPast = dateStr < todayStr
         const schedule = getSchedule(dateStr)
         const blocks = isPast ? schedule.actualBlocks : schedule.idealBlocks
+        const isToday = dateStr === todayStr
 
         return (
           <div
@@ -73,7 +82,7 @@ function DayColumns({
             ))}
             {blocks.map((block) => {
               const top = block.startTime * slotHeight
-              const height = (block.endTime - block.startTime) * slotHeight
+              const height = Math.max(4, (block.endTime - block.startTime) * slotHeight - 1)
               return (
                 <div
                   key={block.id}
@@ -90,6 +99,7 @@ function DayColumns({
                 </div>
               )
             })}
+            {isToday && <CurrentTimeIndicator slotHeight={slotHeight} />}
           </div>
         )
       })}
@@ -119,7 +129,7 @@ function DayHeaders({
             }`}
             onClick={() => onSelectDate?.(dateStr)}
           >
-            {DAY_NAMES[d.getDay()]}<br />{d.getDate()}
+            {DAY_NAMES[d.getDay()]}<br />{d.getMonth() + 1}/{d.getDate()}
           </div>
         )
       })}
@@ -129,15 +139,37 @@ function DayHeaders({
 
 export function MultiDayView({ baseDate, days, onSelectDate, onNavigateDate }: Props) {
   const todayStr = formatDate(new Date())
-  const slotHeight = getSettings().zoomLevel / 2
+
+  const [zoomLevel, setZoomLevel] = useState(loadZoomLevel)
+  const { containerRef, persistZoom } = usePinchZoom(zoomLevel, setZoomLevel)
+  const scale = days === 7 ? 0.5 : 1 / 1.5
+  const slotHeight = zoomLevel * scale
   const totalHeight = SLOT_COUNT * slotHeight
-  const scrollRef = useRef<HTMLDivElement>(null)
+
+  const didScroll = useRef(false)
+
+  useEffect(() => {
+    persistZoom(zoomLevel)
+  }, [zoomLevel, persistZoom])
+
+  // Auto-scroll to current time on mount
+  useEffect(() => {
+    if (didScroll.current) return
+    const el = containerRef.current
+    if (!el) return
+    const now = new Date()
+    const currentSlot = now.getHours() * SLOTS_PER_HOUR + Math.floor(now.getMinutes() / 5)
+    const currentPos = currentSlot * slotHeight
+    const viewHeight = el.clientHeight
+    el.scrollTop = Math.max(0, currentPos - viewHeight / 3)
+    didScroll.current = true
+  }, [slotHeight, containerRef])
 
   const handleNavigate = useCallback((delta: number) => {
     onNavigateDate?.(delta)
   }, [onNavigateDate])
 
-  const { swipeStyle } = useSwipe(scrollRef, handleNavigate, `${days}-${baseDate}`)
+  const { swipeStyle } = useSwipe(containerRef, handleNavigate, `${days}-${baseDate}`)
 
   // Compute dates for prev/current/next panels
   const currentDates = useMemo(() => getDates(baseDate, days), [baseDate, days])
@@ -161,9 +193,9 @@ export function MultiDayView({ baseDate, days, onSelectDate, onNavigateDate }: P
       </div>
 
       {/* Scrollable body — fixed time labels + swipeable day columns */}
-      <div ref={scrollRef} className="flex-1 overflow-y-auto overflow-x-hidden">
+      <div ref={containerRef} className="flex-1 overflow-y-auto overflow-x-hidden">
         <div className="flex" style={{ height: `${totalHeight}px` }}>
-          {/* Fixed time labels */}
+          {/* Fixed time labels (HH:mm) */}
           <div className="relative flex-shrink-0 w-10 text-[10px] text-slate-400">
             {Array.from({ length: 24 }, (_, h) => (
               <div
