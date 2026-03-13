@@ -4,6 +4,18 @@ const SNAP_THRESHOLD = 0.35
 const ANIM_MS = 250
 const DIR_THRESHOLD = 8
 
+export type SwipeConfig = {
+  /** CSS offset for the default position (e.g. '-33.333%' or '-20%') */
+  baseOffset: string
+  /** Fraction of container width for one step (1 = full width, 1/3 = one column of 3) */
+  stepFraction: number
+}
+
+const DEFAULT_CONFIG: SwipeConfig = {
+  baseOffset: '-33.333%',
+  stepFraction: 1,
+}
+
 /**
  * Horizontal swipe hook for calendar navigation.
  * Coexists with usePinchZoom (ignores multi-touch).
@@ -14,7 +26,9 @@ export function useSwipe(
   containerRef: React.RefObject<HTMLDivElement | null>,
   onNavigate: (delta: number) => void,
   viewKey: string,
+  config?: SwipeConfig,
 ) {
+  const { baseOffset, stepFraction } = config ?? DEFAULT_CONFIG
   const [offsetX, setOffsetX] = useState(0)
   const [isAnimating, setIsAnimating] = useState(false)
 
@@ -76,11 +90,13 @@ export function useSwipe(
       return
     }
 
-    const ratio = Math.abs(offsetX) / width
+    // For multi-column views, snap threshold is relative to one step width
+    const stepWidth = width * stepFraction
+    const ratio = Math.abs(offsetX) / stepWidth
 
     if (ratio > SNAP_THRESHOLD) {
-      // Animate to full width, then navigate
-      const targetX = offsetX > 0 ? width : -width
+      // Animate to full step width, then navigate
+      const targetX = offsetX > 0 ? stepWidth : -stepWidth
       setIsAnimating(true)
       setOffsetX(targetX)
 
@@ -95,7 +111,7 @@ export function useSwipe(
       setOffsetX(0)
       setTimeout(() => setIsAnimating(false), ANIM_MS)
     }
-  }, [offsetX])
+  }, [offsetX, stepFraction])
 
   useEffect(() => {
     const el = containerRef.current
@@ -116,7 +132,7 @@ export function useSwipe(
   }, [containerRef, handleTouchStart, handleTouchMove, handleTouchEnd])
 
   const swipeStyle = {
-    transform: `translateX(calc(-33.333% + ${offsetX}px))`,
+    transform: `translateX(calc(${baseOffset} + ${offsetX}px))`,
     transition: isAnimating ? `transform ${ANIM_MS}ms ease-out` : 'none',
   }
 

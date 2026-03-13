@@ -1,7 +1,8 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import type { TimeBlock } from '@/types'
-import { SLOT_COUNT, SLOTS_PER_HOUR, DEFAULT_SETTINGS, IDEAL_COLOR, ACTUAL_COLOR, formatDate, parseDate, getNowInTimezone, getTodayInTimezone } from '@/types'
+import { SLOT_COUNT, SLOTS_PER_HOUR, DEFAULT_SETTINGS, IDEAL_COLOR, ACTUAL_COLOR, formatDate, parseDate, getNowInTimezone, getTodayInTimezone, generateId } from '@/types'
 import { useBlocks } from '@/hooks/useBlocks'
+import { getSchedule as getStoredSchedule, saveSchedule as saveStoredSchedule } from '@/lib/storage'
 import { usePinchZoom } from '@/hooks/usePinchZoom'
 import { useSwipe } from '@/hooks/useSwipe'
 import { getSettings, getSchedule } from '@/lib/storage'
@@ -165,10 +166,57 @@ export function DayView({ date, onOpenHistory, onNavigateDate }: Props) {
     [addActualBlock],
   )
 
-  const handleSave = (data: Omit<TimeBlock, 'id'>) => {
+  const handleSave = (data: Omit<TimeBlock, 'id'> & { endDate?: string }) => {
     const color = editorSide === 'ideal' ? IDEAL_COLOR : ACTUAL_COLOR
-    if (editorSide === 'ideal') addIdealBlock({ ...data, color })
-    else addActualBlock({ ...data, color })
+    const { endDate, ...blockData } = data
+
+    if (endDate && endDate !== date) {
+      // Multi-day block: split across days
+      const addBlock = editorSide === 'ideal' ? addIdealBlock : addActualBlock
+      // First day: startTime to end of day (slot 288)
+      addBlock({ ...blockData, color, endTime: SLOT_COUNT })
+
+      // Middle days: full day (0 to 288)
+      let cursor = parseDate(date)
+      cursor.setDate(cursor.getDate() + 1)
+      while (formatDate(cursor) < endDate) {
+        const midDate = formatDate(cursor)
+        const existing = getStoredSchedule(midDate)
+        const newBlock: TimeBlock = {
+          id: generateId(),
+          title: blockData.title,
+          startTime: 0,
+          endTime: SLOT_COUNT,
+          color,
+        }
+        if (editorSide === 'ideal') {
+          existing.idealBlocks.push(newBlock)
+        } else {
+          existing.actualBlocks.push(newBlock)
+        }
+        saveStoredSchedule(existing)
+        cursor.setDate(cursor.getDate() + 1)
+      }
+
+      // Last day: start of day (0) to endTime
+      const lastExisting = getStoredSchedule(endDate)
+      const lastBlock: TimeBlock = {
+        id: generateId(),
+        title: blockData.title,
+        startTime: 0,
+        endTime: blockData.endTime,
+        color,
+      }
+      if (editorSide === 'ideal') {
+        lastExisting.idealBlocks.push(lastBlock)
+      } else {
+        lastExisting.actualBlocks.push(lastBlock)
+      }
+      saveStoredSchedule(lastExisting)
+    } else {
+      if (editorSide === 'ideal') addIdealBlock({ ...blockData, color })
+      else addActualBlock({ ...blockData, color })
+    }
   }
 
   const handleUpdate = (id: string, data: Partial<TimeBlock>) => {
@@ -279,6 +327,7 @@ export function DayView({ date, onOpenHistory, onNavigateDate }: Props) {
         onClose={() => setEditorOpen(false)}
         block={editingBlock}
         defaultStartSlot={defaultSlot}
+        date={date}
         side={editorSide}
         onSave={handleSave}
         onUpdate={handleUpdate}

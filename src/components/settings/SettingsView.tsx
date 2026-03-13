@@ -88,9 +88,9 @@ export function SettingsView({ onBack }: Props) {
         <h1 className="text-base font-medium">設定</h1>
       </div>
 
-      <div className="p-4 space-y-6 max-w-lg mx-auto">
+      <div className="px-5 pt-6 pb-12 space-y-8 max-w-lg mx-auto">
         {/* 基準時刻 */}
-        <section className="bg-white rounded-xl p-4 shadow-sm">
+        <section className="bg-white rounded-xl p-5 shadow-sm">
           <h2 className="text-sm font-semibold text-gray-700 mb-3">基準時刻（タイムゾーン）</h2>
           <select
             value={settings.timezoneOffset}
@@ -107,7 +107,7 @@ export function SettingsView({ onBack }: Props) {
         </section>
 
         {/* データの管理 */}
-        <section className="bg-white rounded-xl p-4 shadow-sm">
+        <section className="bg-white rounded-xl p-5 shadow-sm">
           <h2 className="text-sm font-semibold text-gray-700 mb-3">データの管理</h2>
           <div className="flex flex-col gap-3">
             <Button
@@ -137,7 +137,7 @@ export function SettingsView({ onBack }: Props) {
         </section>
 
         {/* 投げ銭 */}
-        <section className="bg-white rounded-xl p-4 shadow-sm">
+        <section className="bg-white rounded-xl p-5 shadow-sm">
           <h2 className="text-sm font-semibold text-gray-700 mb-3">開発を応援する</h2>
           <p className="text-xs text-gray-500 mb-3">
             このアプリが役に立っていたら、ぜひ応援をお願いします！

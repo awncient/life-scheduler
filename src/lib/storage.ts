@@ -75,7 +75,7 @@ export function saveMonthlyTodo(todo: MonthlyTodo): void {
 // ===== Settings =====
 
 export function getSettings(): AppSettings {
-  return getJSON<AppSettings>(key('settings')) ?? { ...DEFAULT_SETTINGS }
+  return { ...DEFAULT_SETTINGS, ...getJSON<Partial<AppSettings>>(key('settings')) }
 }
 
 export function saveSettings(settings: AppSettings): void {

@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import type { TimeBlock } from '@/types'
-import { slotToTime, timeToSlot, roundTo5Min, SLOTS_PER_HOUR, SLOT_COUNT, IDEAL_COLOR, ACTUAL_COLOR } from '@/types'
+import { slotToTime, timeToSlot, SLOTS_PER_HOUR, SLOT_COUNT, IDEAL_COLOR, ACTUAL_COLOR, parseDate } from '@/types'
 import {
   Dialog,
   DialogContent,
@@ -8,18 +8,29 @@ import {
 } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Copy, X, Trash2 } from 'lucide-react'
+import { TimeDrumPicker } from './TimeDrumPicker'
+import { Copy, X, Trash2, ChevronDown, ChevronUp } from 'lucide-react'
+
+type SaveData = Omit<TimeBlock, 'id'> & { endDate?: string }
 
 type Props = {
   open: boolean
   onClose: () => void
   block?: TimeBlock | null
   defaultStartSlot?: number
+  date: string
   side: 'ideal' | 'actual'
-  onSave: (data: Omit<TimeBlock, 'id'>) => void
+  onSave: (data: SaveData) => void
   onUpdate?: (id: string, data: Partial<TimeBlock>) => void
   onDelete?: (id: string) => void
   onCopyToActual?: (block: TimeBlock) => void
+}
+
+const DAY_NAMES_JP = ['日', '月', '火', '水', '木', '金', '土']
+
+function formatDateLabel(dateStr: string): string {
+  const d = parseDate(dateStr)
+  return `${d.getMonth() + 1}月${d.getDate()}日（${DAY_NAMES_JP[d.getDay()]}）`
 }
 
 export function BlockEditor({
@@ -27,6 +38,7 @@ export function BlockEditor({
   onClose,
   block,
   defaultStartSlot = 0,
+  date,
   side,
   onSave,
   onUpdate,
@@ -35,36 +47,69 @@ export function BlockEditor({
 }: Props) {
   const isEdit = !!block
   const [title, setTitle] = useState('')
-  const [startTime, setStartTime] = useState('00:00')
-  const [endTime, setEndTime] = useState('01:00')
+  const [startDate, setStartDate] = useState(date)
+  const [endDate, setEndDate] = useState(date)
+  const [startHours, setStartHours] = useState(0)
+  const [startMinutes, setStartMinutes] = useState(0)
+  const [endHours, setEndHours] = useState(1)
+  const [endMinutes, setEndMinutes] = useState(0)
+  const [showStartPicker, setShowStartPicker] = useState(false)
+  const [showEndPicker, setShowEndPicker] = useState(false)
+
   useEffect(() => {
     if (open) {
       if (block) {
         setTitle(block.title)
-        setStartTime(slotToTime(block.startTime))
-        setEndTime(slotToTime(block.endTime))
+        setStartDate(date)
+        setEndDate(date)
+        const st = slotToTime(block.startTime)
+        const et = slotToTime(block.endTime)
+        const [sh, sm] = st.split(':').map(Number)
+        const [eh, em] = et.split(':').map(Number)
+        setStartHours(sh)
+        setStartMinutes(sm)
+        setEndHours(eh)
+        setEndMinutes(em)
       } else {
         setTitle('')
-        setStartTime(slotToTime(defaultStartSlot))
-        setEndTime(slotToTime(Math.min(defaultStartSlot + SLOTS_PER_HOUR, SLOT_COUNT)))
+        setStartDate(date)
+        setEndDate(date)
+        const st = slotToTime(defaultStartSlot)
+        const et = slotToTime(Math.min(defaultStartSlot + SLOTS_PER_HOUR, SLOT_COUNT))
+        const [sh, sm] = st.split(':').map(Number)
+        const [eh, em] = et.split(':').map(Number)
+        setStartHours(sh)
+        setStartMinutes(sm)
+        setEndHours(eh)
+        setEndMinutes(em)
       }
+      setShowStartPicker(false)
+      setShowEndPicker(false)
     }
-  }, [open, block, defaultStartSlot])
-
-  const handleTimeChange = (setter: (v: string) => void) => (e: React.ChangeEvent<HTMLInputElement>) => {
-    setter(roundTo5Min(e.target.value))
-  }
+  }, [open, block, defaultStartSlot, date])
 
   const color = side === 'ideal' ? IDEAL_COLOR : ACTUAL_COLOR
 
+  const startTimeStr = `${startHours.toString().padStart(2, '0')}:${startMinutes.toString().padStart(2, '0')}`
+  const endTimeStr = `${endHours.toString().padStart(2, '0')}:${endMinutes.toString().padStart(2, '0')}`
+
+  const isMultiDay = startDate !== endDate
+  const isValidRange = isMultiDay
+    ? startDate < endDate || (startDate === endDate && timeToSlot(startTimeStr) < timeToSlot(endTimeStr))
+    : timeToSlot(startTimeStr) < timeToSlot(endTimeStr)
+
   const handleSave = () => {
-    const start = timeToSlot(startTime)
-    const end = timeToSlot(endTime)
-    if (start >= end) return
+    if (!isValidRange) return
     const finalTitle = title.trim() || '（タイトルなし）'
+    const start = timeToSlot(startTimeStr)
+    const end = timeToSlot(endTimeStr)
 
     if (isEdit && onUpdate && block) {
+      // Editing existing block: single-day only (keep simple)
       onUpdate(block.id, { title: finalTitle, startTime: start, endTime: end, color })
+    } else if (isMultiDay) {
+      // Multi-day: pass endDate to parent for splitting
+      onSave({ title: finalTitle, startTime: start, endTime: end, color, endDate })
     } else {
       onSave({ title: finalTitle, startTime: start, endTime: end, color })
     }
@@ -86,90 +131,129 @@ export function BlockEditor({
   }
 
   return (
-    <>
-      <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
-        <DialogContent>
-          {/* Visually hidden description for accessibility */}
-          <DialogDescription className="sr-only">
-            {side === 'ideal' ? '理想（予定）' : '実際（記録）'}のブロック{isEdit ? '編集' : '追加'}
-          </DialogDescription>
+    <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
+      <DialogContent>
+        <DialogDescription className="sr-only">
+          {side === 'ideal' ? '理想（予定）' : '実際（記録）'}のブロック{isEdit ? '編集' : '追加'}
+        </DialogDescription>
 
-          {/* Top bar: X left, side label center, trash right */}
-          <div className="flex items-center justify-between -mt-1 mb-3">
+        {/* Top bar */}
+        <div className="flex items-center justify-between -mt-1 mb-3">
+          <button
+            className="rounded-sm opacity-70 hover:opacity-100 p-1"
+            onClick={onClose}
+          >
+            <X className="h-5 w-5" />
+          </button>
+          <span className="text-xs font-medium text-slate-500">
+            {side === 'ideal' ? '理想（予定）' : '実際（記録）'}
+          </span>
+          {isEdit ? (
             <button
-              className="rounded-sm opacity-70 hover:opacity-100 p-1"
-              onClick={onClose}
+              className="rounded-sm opacity-70 hover:opacity-100 text-red-500 p-1"
+              onClick={handleDelete}
             >
-              <X className="h-5 w-5" />
+              <Trash2 className="h-5 w-5" />
             </button>
-            <span className="text-xs font-medium text-slate-500">
-              {side === 'ideal' ? '理想（予定）' : '実際（記録）'}
-            </span>
-            {isEdit ? (
-              <button
-                className="rounded-sm opacity-70 hover:opacity-100 text-red-500 p-1"
-                onClick={handleDelete}
-              >
-                <Trash2 className="h-5 w-5" />
-              </button>
-            ) : (
-              <div className="w-7" />
+          ) : (
+            <div className="w-7" />
+          )}
+        </div>
+
+        <div className="space-y-4">
+          <div>
+            <Input
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              placeholder="タイトルを入力"
+              autoFocus
+            />
+          </div>
+
+          {/* Start date + time */}
+          <div>
+            <button
+              className="w-full flex items-center justify-between px-3 py-2.5 border border-slate-200 rounded-lg text-sm hover:bg-slate-50 transition-colors"
+              onClick={() => { setShowStartPicker(!showStartPicker); setShowEndPicker(false) }}
+            >
+              <span className="text-slate-500 text-xs">開始</span>
+              <span className="font-medium">
+                {formatDateLabel(startDate)}&ensp;{startTimeStr}
+              </span>
+              {showStartPicker ? <ChevronUp className="h-4 w-4 text-slate-400" /> : <ChevronDown className="h-4 w-4 text-slate-400" />}
+            </button>
+            {showStartPicker && (
+              <div className="mt-2 space-y-2">
+                <input
+                  type="date"
+                  value={startDate}
+                  onChange={(e) => {
+                    setStartDate(e.target.value)
+                    if (e.target.value > endDate) setEndDate(e.target.value)
+                  }}
+                  className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm"
+                />
+                <TimeDrumPicker
+                  hours={startHours}
+                  minutes={startMinutes}
+                  onChange={(h, m) => { setStartHours(h); setStartMinutes(m) }}
+                />
+              </div>
             )}
           </div>
 
-          <div className="space-y-4">
-            <div>
-              <label className="text-sm font-medium text-slate-700">タイトル</label>
-              <Input
-                value={title}
-                onChange={(e) => setTitle(e.target.value)}
-                placeholder="例: 朝の勉強"
-                autoFocus
-              />
-            </div>
-
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="text-sm font-medium text-slate-700">開始</label>
-                <Input
-                  type="time"
-                  value={startTime}
-                  step={300}
-                  onChange={handleTimeChange(setStartTime)}
+          {/* End date + time */}
+          <div>
+            <button
+              className="w-full flex items-center justify-between px-3 py-2.5 border border-slate-200 rounded-lg text-sm hover:bg-slate-50 transition-colors"
+              onClick={() => { setShowEndPicker(!showEndPicker); setShowStartPicker(false) }}
+            >
+              <span className="text-slate-500 text-xs">終了</span>
+              <span className="font-medium">
+                {formatDateLabel(endDate)}&ensp;{endTimeStr}
+              </span>
+              {showEndPicker ? <ChevronUp className="h-4 w-4 text-slate-400" /> : <ChevronDown className="h-4 w-4 text-slate-400" />}
+            </button>
+            {showEndPicker && (
+              <div className="mt-2 space-y-2">
+                <input
+                  type="date"
+                  value={endDate}
+                  min={startDate}
+                  onChange={(e) => setEndDate(e.target.value)}
+                  className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm"
+                />
+                <TimeDrumPicker
+                  hours={endHours}
+                  minutes={endMinutes}
+                  onChange={(h, m) => { setEndHours(h); setEndMinutes(m) }}
                 />
               </div>
-              <div>
-                <label className="text-sm font-medium text-slate-700">終了</label>
-                <Input
-                  type="time"
-                  value={endTime}
-                  step={300}
-                  onChange={handleTimeChange(setEndTime)}
-                />
-              </div>
-            </div>
-
-            <div className="flex gap-2 pt-2">
-              <Button onClick={handleSave} className="flex-1">
-                {isEdit ? '更新' : '追加'}
-              </Button>
-            </div>
-
-            {/* Copy to actual — only for ideal blocks in edit mode */}
-            {isEdit && side === 'ideal' && onCopyToActual && (
-              <Button
-                variant="outline"
-                className="w-full gap-2"
-                onClick={handleCopyToActual}
-              >
-                <Copy className="h-4 w-4" />
-                実際欄にコピー
-              </Button>
             )}
           </div>
-        </DialogContent>
-      </Dialog>
 
-    </>
+          {!isValidRange && (
+            <p className="text-xs text-red-500">終了日時は開始日時より後に設定してください</p>
+          )}
+
+          <div className="flex gap-2 pt-2">
+            <Button onClick={handleSave} className="flex-1" disabled={!isValidRange}>
+              {isEdit ? '更新' : '追加'}
+            </Button>
+          </div>
+
+          {isEdit && side === 'ideal' && onCopyToActual && (
+            <Button
+              variant="outline"
+              className="w-full gap-2"
+              onClick={handleCopyToActual}
+            >
+              <Copy className="h-4 w-4" />
+              実際欄にコピー
+            </Button>
+          )}
+        </div>
+      </DialogContent>
+    </Dialog>
   )
 }
