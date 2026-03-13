@@ -93,7 +93,7 @@ export function SearchModal({ open, onClose, onSelectDate }: Props) {
               onClick={() => handleSelect(r.date)}
             >
               <div>
-                <div className="text-sm font-medium">{r.title}</div>
+                <div className="text-sm font-medium">{r.title || '（タイトルなし）'}</div>
                 <div className="text-xs text-slate-400">
                   {r.date} {r.startTime} ({r.side === 'ideal' ? '理想' : '実際'})
                 </div>

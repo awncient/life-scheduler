@@ -47,7 +47,7 @@ function ReadOnlyBlocks({ blocks, slotHeight }: { blocks: TimeBlock[]; slotHeigh
               minHeight: '4px',
             }}
           >
-            <div className="truncate leading-tight">{block.title}</div>
+            <div className="truncate leading-tight">{block.title || '（タイトルなし）'}</div>
           </div>
         )
       })}
@@ -217,11 +217,27 @@ export function DayView({ date, onOpenHistory, onNavigateDate }: Props) {
   }
 
   const handleUpdate = (id: string, data: Partial<TimeBlock> & { endDate?: string }) => {
-    const sourceDate = editingBlock?._sourceScheduleDate
-    if (sourceDate && sourceDate !== date) {
-      // Block is stored on a different day's schedule — update there
+    const sourceDate = editingBlock?._sourceScheduleDate || date
+    const key = editorSide === 'ideal' ? 'idealBlocks' : 'actualBlocks' as const
+    const newStartDate = data.startDate || sourceDate
+
+    // ブロックの開始日が保存先と異なる場合、ブロックを正しいスケジュールに移動する
+    if (newStartDate !== sourceDate) {
+      // 元のスケジュールからブロックを削除
+      const oldSchedule = getStoredSchedule(sourceDate)
+      const removedBlock = oldSchedule[key].find((b: TimeBlock) => b.id === id)
+      oldSchedule[key] = oldSchedule[key].filter((b: TimeBlock) => b.id !== id)
+      saveStoredSchedule(oldSchedule)
+
+      // 新しいスケジュールにブロックを追加
+      const newSchedule = getStoredSchedule(newStartDate)
+      const updatedBlock = { ...(removedBlock || editingBlock!), ...data }
+      newSchedule[key] = [...newSchedule[key], updatedBlock]
+      saveStoredSchedule(newSchedule)
+      refresh()
+    } else if (sourceDate !== date) {
+      // ブロックは別の日のスケジュールに保存されているが、開始日は変わらない
       const sourceSchedule = getStoredSchedule(sourceDate)
-      const key = editorSide === 'ideal' ? 'idealBlocks' : 'actualBlocks' as const
       sourceSchedule[key] = sourceSchedule[key].map((b: TimeBlock) =>
         b.id === id ? { ...b, ...data } : b,
       )
@@ -234,9 +250,9 @@ export function DayView({ date, onOpenHistory, onNavigateDate }: Props) {
   }
 
   const handleDelete = (id: string) => {
-    const sourceDate = editingBlock?._sourceScheduleDate
-    if (sourceDate && sourceDate !== date) {
-      // Block is stored on a different day's schedule — delete there
+    const sourceDate = editingBlock?._sourceScheduleDate || date
+    if (sourceDate !== date) {
+      // ブロックは別の日のスケジュールに保存されている — そこから削除
       const sourceSchedule = getStoredSchedule(sourceDate)
       const key = editorSide === 'ideal' ? 'idealBlocks' : 'actualBlocks' as const
       sourceSchedule[key] = sourceSchedule[key].filter((b: TimeBlock) => b.id !== id)

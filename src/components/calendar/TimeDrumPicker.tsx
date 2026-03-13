@@ -1,4 +1,4 @@
-import { useRef, useEffect, useCallback } from 'react'
+import { useRef, useEffect, useCallback, forwardRef, useImperativeHandle } from 'react'
 
 const ITEM_HEIGHT = 40
 const VISIBLE_ITEMS = 5
@@ -9,9 +9,10 @@ type DrumColumnProps = {
   items: string[]
   selectedIndex: number
   onChange: (index: number) => void
+  align?: 'left' | 'right'
 }
 
-function DrumColumn({ items, selectedIndex, onChange }: DrumColumnProps) {
+const DrumColumn = forwardRef<{ scrollToIndex: (i: number) => void }, DrumColumnProps>(function DrumColumn({ items, selectedIndex, onChange, align = 'left' }, ref) {
   const containerRef = useRef<HTMLDivElement>(null)
   const isDragging = useRef(false)
   const startY = useRef(0)
@@ -24,6 +25,10 @@ function DrumColumn({ items, selectedIndex, onChange }: DrumColumnProps) {
 
   const count = items.length
   const middleOffset = count * ITEM_HEIGHT
+
+  useImperativeHandle(ref, () => ({
+    scrollToIndex: (i: number) => scrollToLogicalIndex(i),
+  }), [])
 
   const scrollToLogicalIndex = useCallback((index: number, smooth = true) => {
     const el = containerRef.current
@@ -135,10 +140,12 @@ function DrumColumn({ items, selectedIndex, onChange }: DrumColumnProps) {
     }
   }
 
+  const justifyClass = align === 'right' ? 'justify-end pr-1' : 'justify-start pl-1'
+
   return (
     <div
       ref={containerRef}
-      className="relative overflow-hidden touch-none"
+      className="absolute inset-0 overflow-hidden touch-none"
       style={{ height: ITEM_HEIGHT * VISIBLE_ITEMS }}
       onTouchStart={handleTouchStart}
       onTouchMove={handleTouchMove}
@@ -151,7 +158,7 @@ function DrumColumn({ items, selectedIndex, onChange }: DrumColumnProps) {
           return (
             <div
               key={i}
-              className={`flex items-center justify-center cursor-pointer select-none transition-colors text-base ${
+              className={`flex items-center ${justifyClass} cursor-pointer select-none transition-colors text-base ${
                 isSelected ? 'text-slate-900' : 'text-slate-400'
               }`}
               style={{ height: ITEM_HEIGHT }}
@@ -164,7 +171,7 @@ function DrumColumn({ items, selectedIndex, onChange }: DrumColumnProps) {
       </div>
     </div>
   )
-}
+})
 
 type Props = {
   hours: number
@@ -178,6 +185,8 @@ const MINUTES_5 = Array.from({ length: 12 }, (_, i) => (i * 5).toString().padSta
 export function TimeDrumPicker({ hours, minutes, onChange }: Props) {
   const minuteIndex = Math.floor(minutes / 5)
   const totalHeight = ITEM_HEIGHT * VISIBLE_ITEMS
+  const hourRef = useRef<{ scrollToIndex: (i: number) => void }>(null)
+  const minuteRef = useRef<{ scrollToIndex: (i: number) => void }>(null)
 
   return (
     <div className="relative" style={{ height: totalHeight }}>
@@ -186,34 +195,34 @@ export function TimeDrumPicker({ hours, minutes, onChange }: Props) {
         className="absolute left-0 right-0 bg-slate-100 rounded-lg pointer-events-none"
         style={{ top: CENTER_INDEX * ITEM_HEIGHT, height: ITEM_HEIGHT, zIndex: 0 }}
       />
-      {/* Two scrollable columns pushed toward center */}
+      {/* 左半分=時間、右半分=分のタッチ領域。内側にドラムカラムを表示 */}
       <div className="flex h-full relative items-stretch" style={{ zIndex: 1 }}>
-        {/* Left half: tapping/scrolling here controls hours */}
-        <div className="flex-1 flex justify-end">
-          <div style={{ width: 56 }}>
-            <DrumColumn
-              items={HOURS}
-              selectedIndex={hours}
-              onChange={(i) => onChange(i, minutes)}
-            />
-          </div>
+        {/* 左半分: スクロールで時間を変更 */}
+        <div className="flex-1 relative">
+          <DrumColumn
+            ref={hourRef}
+            items={HOURS}
+            selectedIndex={hours}
+            onChange={(i) => onChange(i, minutes)}
+            align="right"
+          />
         </div>
-        {/* Colon */}
+        {/* コロン */}
         <div
           className="flex items-center justify-center text-base text-slate-400 pointer-events-none"
           style={{ width: 16, marginTop: CENTER_INDEX * ITEM_HEIGHT, height: ITEM_HEIGHT }}
         >
           :
         </div>
-        {/* Right half: tapping/scrolling here controls minutes */}
-        <div className="flex-1 flex justify-start">
-          <div style={{ width: 56 }}>
-            <DrumColumn
-              items={MINUTES_5}
-              selectedIndex={minuteIndex}
-              onChange={(i) => onChange(hours, i * 5)}
-            />
-          </div>
+        {/* 右半分: スクロールで分を変更 */}
+        <div className="flex-1 relative">
+          <DrumColumn
+            ref={minuteRef}
+            items={MINUTES_5}
+            selectedIndex={minuteIndex}
+            onChange={(i) => onChange(hours, i * 5)}
+            align="left"
+          />
         </div>
       </div>
       {/* Fade masks */}

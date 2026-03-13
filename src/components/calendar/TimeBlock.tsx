@@ -180,7 +180,7 @@ export function TimeBlockItem({ block, slotHeight, onTap, onDragEnd, onCopyToAct
       }}
       onClick={handleClick}
     >
-      <div className="font-medium leading-tight break-words">{block.title}</div>
+      <div className="font-medium leading-tight break-words">{block.title || '（タイトルなし）'}</div>
       {height > slotHeight * 6 && (
         <div className="opacity-60 text-[10px] leading-tight">{timeLabel}</div>
       )}

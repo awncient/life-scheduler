@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import type { TimeBlock } from '@/types'
 import { slotToTime, timeToSlot, SLOTS_PER_HOUR, SLOT_COUNT, IDEAL_COLOR, ACTUAL_COLOR, parseDate } from '@/types'
 import {
@@ -7,10 +7,9 @@ import {
   DialogDescription,
 } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
 import { TimeDrumPicker } from './TimeDrumPicker'
 import { MonthCalendar } from './MonthCalendar'
-import { Copy, X, Trash2 } from 'lucide-react'
+import { Copy, Trash2 } from 'lucide-react'
 
 type SaveData = Omit<TimeBlock, 'id'> & { endDate?: string }
 
@@ -36,6 +35,42 @@ function formatDateLabel(dateStr: string): string {
 
 function formatTimeLabel(h: number, m: number): string {
   return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}`
+}
+
+function AutoExpandTextarea({
+  value,
+  onChange,
+  placeholder,
+}: {
+  value: string
+  onChange: (v: string) => void
+  placeholder: string
+}) {
+  const ref = useRef<HTMLTextAreaElement>(null)
+
+  const resize = useCallback(() => {
+    const el = ref.current
+    if (!el) return
+    el.style.height = 'auto'
+    el.style.height = `${Math.max(56, el.scrollHeight)}px`
+  }, [])
+
+  useEffect(() => {
+    resize()
+  }, [value, resize])
+
+  return (
+    <textarea
+      ref={ref}
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
+      placeholder={placeholder}
+      className="w-full text-lg px-3 py-3 border border-slate-200 rounded-md resize-none overflow-hidden focus:outline-none focus:ring-2 focus:ring-slate-400"
+      style={{ minHeight: 56 }}
+      rows={1}
+      autoFocus
+    />
+  )
 }
 
 type PickerState = null | 'startDate' | 'startTime' | 'endDate' | 'endTime'
@@ -65,7 +100,7 @@ export function BlockEditor({
   useEffect(() => {
     if (open) {
       if (block) {
-        setTitle(block.title)
+        setTitle(block.title === '（タイトルなし）' ? '' : block.title)
         const blockStartDate = block.startDate || date
         const blockEndDate = block.endDate || date
         setStartDate(blockStartDate)
@@ -107,7 +142,7 @@ export function BlockEditor({
 
   const handleSave = () => {
     if (!isValidRange) return
-    const finalTitle = title.trim() || '（タイトルなし）'
+    const finalTitle = title.trim()
     const start = timeToSlot(startTimeStr)
     const end = timeToSlot(endTimeStr)
 
@@ -160,35 +195,40 @@ export function BlockEditor({
         {/* Top bar */}
         <div className="flex items-center justify-between -mt-1 mb-3">
           <button
-            className="rounded-sm opacity-70 hover:opacity-100 p-1"
+            className="text-blue-500 text-sm font-medium px-1 py-1"
             onClick={onClose}
           >
-            <X className="h-5 w-5" />
+            キャンセル
           </button>
           <span className="text-xs font-medium text-slate-500">
             {side === 'ideal' ? '理想（予定）' : '実際（記録）'}
           </span>
-          {isEdit ? (
+          <div className="flex items-center gap-1">
+            {isEdit && (
+              <button
+                className="text-red-500 p-1"
+                onClick={handleDelete}
+              >
+                <Trash2 className="h-5 w-5" />
+              </button>
+            )}
             <button
-              className="rounded-sm opacity-70 hover:opacity-100 text-red-500 p-1"
-              onClick={handleDelete}
+              className={`text-sm font-semibold px-1 py-1 ${isValidRange ? 'text-blue-500' : 'text-slate-300'}`}
+              onClick={handleSave}
+              disabled={!isValidRange}
             >
-              <Trash2 className="h-5 w-5" />
+              {isEdit ? '更新' : '保存'}
             </button>
-          ) : (
-            <div className="w-7" />
-          )}
+          </div>
         </div>
 
         <div className="space-y-4">
-          {/* Title */}
+          {/* Title — auto-expanding textarea */}
           <div>
-            <Input
+            <AutoExpandTextarea
               value={title}
-              onChange={(e) => setTitle(e.target.value)}
+              onChange={setTitle}
               placeholder="タイトルを入力"
-              className="h-14 text-lg"
-              autoFocus
             />
           </div>
 
@@ -287,12 +327,6 @@ export function BlockEditor({
           {!isValidRange && (
             <p className="text-xs text-red-500">終了日時は開始日時より後に設定してください</p>
           )}
-
-          <div className="flex gap-2 pt-2">
-            <Button onClick={handleSave} className="flex-1" disabled={!isValidRange}>
-              {isEdit ? '更新' : '追加'}
-            </Button>
-          </div>
 
           {isEdit && side === 'ideal' && onCopyToActual && (
             <Button

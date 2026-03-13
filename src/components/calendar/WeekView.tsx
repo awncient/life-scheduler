@@ -95,7 +95,7 @@ export function WeekView({ baseDate, onSelectDate }: Props) {
                       }}
                       onClick={() => onSelectDate(dateStr)}
                     >
-                      <div className="truncate leading-tight">{block.title}</div>
+                      <div className="truncate leading-tight">{block.title || '（タイトルなし）'}</div>
                     </div>
                   )
                 })}

@@ -81,11 +81,11 @@ export function SettingsView({ onBack }: Props) {
 
   return (
     <div className="h-full overflow-y-auto bg-white">
-      <div className="sticky top-0 z-10 flex items-center gap-2 px-4 py-3 bg-slate-800 text-white safe-area-top">
-        <button onClick={onBack} className="p-1 rounded hover:bg-slate-700 transition-colors">
+      <div className="sticky top-0 z-10 flex items-center px-4 py-3 bg-slate-800 text-white safe-area-top">
+        <button onClick={onBack} className="flex items-center gap-2 p-1 -ml-1 rounded hover:bg-slate-700 transition-colors">
           <ArrowLeft className="h-5 w-5" />
+          <span className="text-base font-medium">設定</span>
         </button>
-        <h1 className="text-base font-medium">設定</h1>
       </div>
 
       <div className="px-5 pt-8 pb-16 max-w-lg mx-auto flex flex-col gap-5">

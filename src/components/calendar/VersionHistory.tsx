@@ -204,7 +204,7 @@ export function VersionHistoryView({ date, onBack }: Props) {
                             minHeight: '4px',
                           }}
                         >
-                          <div className="truncate leading-tight">{block.title}</div>
+                          <div className="truncate leading-tight">{block.title || '（タイトルなし）'}</div>
                         </div>
                       )
                     })}
