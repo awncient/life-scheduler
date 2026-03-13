@@ -185,8 +185,13 @@ export function useBlocks(date: string) {
     [schedule],
   )
 
+  const refresh = useCallback(() => {
+    setSchedule(getSchedule(date))
+  }, [date])
+
   return {
     schedule,
+    refresh,
     addIdealBlock,
     updateIdealBlock,
     deleteIdealBlock,

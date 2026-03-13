@@ -2,9 +2,9 @@ import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import type { TimeBlock } from '@/types'
 import { SLOT_COUNT, SLOTS_PER_HOUR, DEFAULT_SETTINGS, IDEAL_COLOR, ACTUAL_COLOR, formatDate, parseDate, getNowInTimezone, getTodayInTimezone, adjustBlocksForTimezone, getVisibleBlocksForDay } from '@/types'
 import { useBlocks } from '@/hooks/useBlocks'
+import { getSchedule, getSchedule as getStoredSchedule, saveSchedule as saveStoredSchedule, getSettings } from '@/lib/storage'
 import { usePinchZoom } from '@/hooks/usePinchZoom'
 import { useSwipe } from '@/hooks/useSwipe'
-import { getSettings, getSchedule } from '@/lib/storage'
 import { TimeGrid, TimeLabels } from './TimeGrid'
 import { BlockEditor } from './BlockEditor'
 import { CurrentTimeIndicator } from './CurrentTimeIndicator'
@@ -97,6 +97,7 @@ function getEffectiveBlocks(dateStr: string, side: 'ideal' | 'actual'): TimeBloc
 export function DayView({ date, onOpenHistory, onNavigateDate }: Props) {
   const {
     schedule,
+    refresh,
     addIdealBlock,
     updateIdealBlock,
     deleteIdealBlock,
@@ -166,9 +167,14 @@ export function DayView({ date, onOpenHistory, onNavigateDate }: Props) {
 
   const handleBlockTap = (side: 'ideal' | 'actual', block: TimeBlock) => {
     setEditorSide(side)
-    // Pass the original block data including startDate/endDate for editing
-    setEditingBlock(block)
-    setDefaultSlot(block.startTime)
+    // Restore original times for the editor (not the clipped visible times)
+    const editBlock: TimeBlock = {
+      ...block,
+      startTime: block._origStartTime ?? block.startTime,
+      endTime: block._origEndTime ?? block.endTime,
+    }
+    setEditingBlock(editBlock)
+    setDefaultSlot(editBlock.startTime)
     setEditorOpen(true)
   }
 
@@ -211,13 +217,35 @@ export function DayView({ date, onOpenHistory, onNavigateDate }: Props) {
   }
 
   const handleUpdate = (id: string, data: Partial<TimeBlock> & { endDate?: string }) => {
-    if (editorSide === 'ideal') updateIdealBlock(id, data)
-    else updateActualBlock(id, data)
+    const sourceDate = editingBlock?._sourceScheduleDate
+    if (sourceDate && sourceDate !== date) {
+      // Block is stored on a different day's schedule — update there
+      const sourceSchedule = getStoredSchedule(sourceDate)
+      const key = editorSide === 'ideal' ? 'idealBlocks' : 'actualBlocks' as const
+      sourceSchedule[key] = sourceSchedule[key].map((b: TimeBlock) =>
+        b.id === id ? { ...b, ...data } : b,
+      )
+      saveStoredSchedule(sourceSchedule)
+      refresh()
+    } else {
+      if (editorSide === 'ideal') updateIdealBlock(id, data)
+      else updateActualBlock(id, data)
+    }
   }
 
   const handleDelete = (id: string) => {
-    if (editorSide === 'ideal') deleteIdealBlock(id)
-    else deleteActualBlock(id)
+    const sourceDate = editingBlock?._sourceScheduleDate
+    if (sourceDate && sourceDate !== date) {
+      // Block is stored on a different day's schedule — delete there
+      const sourceSchedule = getStoredSchedule(sourceDate)
+      const key = editorSide === 'ideal' ? 'idealBlocks' : 'actualBlocks' as const
+      sourceSchedule[key] = sourceSchedule[key].filter((b: TimeBlock) => b.id !== id)
+      saveStoredSchedule(sourceSchedule)
+      refresh()
+    } else {
+      if (editorSide === 'ideal') deleteIdealBlock(id)
+      else deleteActualBlock(id)
+    }
   }
 
   const totalHeight = SLOT_COUNT * slotHeight

@@ -8,6 +8,10 @@ export type TimeBlock = {
   timezoneOffset?: number // 作成時のUTCオフセット（分）
   startDate?: string // ブロックの開始日 (YYYY-MM-DD)。日跨ぎブロック用
   endDate?: string   // ブロックの終了日 (YYYY-MM-DD)。未設定=同日
+  // 表示用の一時フィールド（getVisibleBlocksForDayで付与）
+  _origStartTime?: number  // 保存時の元のstartTime
+  _origEndTime?: number    // 保存時の元のendTime
+  _sourceScheduleDate?: string // このブロックが保存されているスケジュールの日付
 }
 
 // ===== 1日のスケジュール =====
@@ -174,9 +178,12 @@ export function getVisibleBlocksForDay(
         ...block,
         startTime: visibleStart,
         endTime: visibleEnd,
-        // Preserve original data for editing
         startDate: blockStart,
         endDate: blockEnd !== blockStart ? blockEnd : undefined,
+        // Preserve original data for editing/lookup
+        _origStartTime: block.startTime,
+        _origEndTime: block.endTime,
+        _sourceScheduleDate: scheduleDate,
       })
     }
   }
