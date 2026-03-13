@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useRef, useCallback } from 'react'
-import { formatDate, parseDate, slotToTime, SLOT_COUNT, SLOTS_PER_HOUR, DEFAULT_SETTINGS, getTodayInTimezone, getNowInTimezone } from '@/types'
+import { formatDate, parseDate, slotToTime, SLOT_COUNT, SLOTS_PER_HOUR, DEFAULT_SETTINGS, getTodayInTimezone, getNowInTimezone, adjustBlocksForTimezone } from '@/types'
 import { getSchedule, getSettings } from '@/lib/storage'
 import { usePinchZoom } from '@/hooks/usePinchZoom'
 import { useSwipe } from '@/hooks/useSwipe'
@@ -62,7 +62,9 @@ function DayColumn({
 }) {
   const isPast = dateStr < todayStr
   const schedule = getSchedule(dateStr)
-  const blocks = isPast ? schedule.actualBlocks : schedule.idealBlocks
+  const tz = getSettings().timezoneOffset
+  const rawBlocks = isPast ? schedule.actualBlocks : schedule.idealBlocks
+  const blocks = adjustBlocksForTimezone(rawBlocks, tz)
   const isToday = dateStr === todayStr
 
   return (

@@ -166,7 +166,6 @@ export function BlockEditor({
               value={title}
               onChange={(e) => setTitle(e.target.value)}
               placeholder="タイトルを入力"
-              className="h-12 text-base"
               autoFocus
             />
           </div>
@@ -174,7 +173,8 @@ export function BlockEditor({
           {/* Start date + time */}
           <div>
             <button
-              className="w-full flex items-center justify-between px-4 py-7 border border-slate-200 rounded-lg hover:bg-slate-50 transition-colors"
+              className="w-full flex items-center justify-between px-4 border border-slate-200 rounded-lg hover:bg-slate-50 transition-colors"
+              style={{ paddingTop: '1.25rem', paddingBottom: '1.25rem' }}
               onClick={() => { setShowStartPicker(!showStartPicker); setShowEndPicker(false) }}
             >
               <span className="text-slate-500 text-base">開始</span>
@@ -206,7 +206,8 @@ export function BlockEditor({
           {/* End date + time */}
           <div>
             <button
-              className="w-full flex items-center justify-between px-4 py-7 border border-slate-200 rounded-lg hover:bg-slate-50 transition-colors"
+              className="w-full flex items-center justify-between px-4 border border-slate-200 rounded-lg hover:bg-slate-50 transition-colors"
+              style={{ paddingTop: '1.25rem', paddingBottom: '1.25rem' }}
               onClick={() => { setShowEndPicker(!showEndPicker); setShowStartPicker(false) }}
             >
               <span className="text-slate-500 text-base">終了</span>

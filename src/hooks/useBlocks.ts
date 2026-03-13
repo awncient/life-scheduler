@@ -1,7 +1,7 @@
 import { useState, useCallback, useEffect } from 'react'
 import type { TimeBlock, DaySchedule } from '@/types'
 import { generateId, SLOT_COUNT } from '@/types'
-import { getSchedule, saveSchedule, getSnapshots, saveSnapshots } from '@/lib/storage'
+import { getSchedule, saveSchedule, getSnapshots, saveSnapshots, getSettings } from '@/lib/storage'
 
 const SNAPSHOT_INTERVAL_MS = 10 * 60 * 1000 // 10 minutes
 
@@ -75,9 +75,10 @@ export function useBlocks(date: string) {
   const addIdealBlock = useCallback(
     (block: Omit<TimeBlock, 'id'>) => {
       const prev = schedule.idealBlocks
+      const tz = getSettings().timezoneOffset
       const updated = {
         ...schedule,
-        idealBlocks: [...prev, { ...block, id: generateId() }],
+        idealBlocks: [...prev, { ...block, id: generateId(), timezoneOffset: tz }],
       }
       saveWithOptionalSnapshot(updated, prev)
     },
@@ -129,9 +130,10 @@ export function useBlocks(date: string) {
   // Actual blocks
   const addActualBlock = useCallback(
     (block: Omit<TimeBlock, 'id'>) => {
+      const tz = getSettings().timezoneOffset
       const updated = {
         ...schedule,
-        actualBlocks: [...schedule.actualBlocks, { ...block, id: generateId() }],
+        actualBlocks: [...schedule.actualBlocks, { ...block, id: generateId(), timezoneOffset: tz }],
       }
       saveSchedule(updated)
       setSchedule(updated)

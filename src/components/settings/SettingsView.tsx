@@ -88,7 +88,7 @@ export function SettingsView({ onBack }: Props) {
         <h1 className="text-base font-medium">設定</h1>
       </div>
 
-      <div className="px-5 pt-8 pb-16 max-w-lg mx-auto flex flex-col gap-8">
+      <div className="px-5 pt-8 pb-16 max-w-lg mx-auto flex flex-col gap-5">
         {/* 基準時刻 */}
         <section>
           <h2 className="text-sm font-semibold text-gray-700 mb-3">基準時刻（タイムゾーン）</h2>

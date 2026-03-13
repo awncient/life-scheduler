@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import type { TimeBlock } from '@/types'
-import { SLOT_COUNT, SLOTS_PER_HOUR, DEFAULT_SETTINGS, IDEAL_COLOR, ACTUAL_COLOR, formatDate, parseDate, getNowInTimezone, getTodayInTimezone, generateId } from '@/types'
+import { SLOT_COUNT, SLOTS_PER_HOUR, DEFAULT_SETTINGS, IDEAL_COLOR, ACTUAL_COLOR, formatDate, parseDate, getNowInTimezone, getTodayInTimezone, generateId, adjustBlocksForTimezone } from '@/types'
 import { useBlocks } from '@/hooks/useBlocks'
 import { getSchedule as getStoredSchedule, saveSchedule as saveStoredSchedule } from '@/lib/storage'
 import { usePinchZoom } from '@/hooks/usePinchZoom'
@@ -177,6 +177,7 @@ export function DayView({ date, onOpenHistory, onNavigateDate }: Props) {
       addBlock({ ...blockData, color, endTime: SLOT_COUNT })
 
       // Middle days: full day (0 to 288)
+      const tz = timezoneOffset
       let cursor = parseDate(date)
       cursor.setDate(cursor.getDate() + 1)
       while (formatDate(cursor) < endDate) {
@@ -188,6 +189,7 @@ export function DayView({ date, onOpenHistory, onNavigateDate }: Props) {
           startTime: 0,
           endTime: SLOT_COUNT,
           color,
+          timezoneOffset: tz,
         }
         if (editorSide === 'ideal') {
           existing.idealBlocks.push(newBlock)
@@ -206,6 +208,7 @@ export function DayView({ date, onOpenHistory, onNavigateDate }: Props) {
         startTime: 0,
         endTime: blockData.endTime,
         color,
+        timezoneOffset: tz,
       }
       if (editorSide === 'ideal') {
         lastExisting.idealBlocks.push(lastBlock)
@@ -231,6 +234,16 @@ export function DayView({ date, onOpenHistory, onNavigateDate }: Props) {
 
   const totalHeight = SLOT_COUNT * slotHeight
 
+  // Timezone-adjusted blocks for display
+  const adjustedIdealBlocks = useMemo(
+    () => adjustBlocksForTimezone(schedule.idealBlocks, timezoneOffset),
+    [schedule.idealBlocks, timezoneOffset],
+  )
+  const adjustedActualBlocks = useMemo(
+    () => adjustBlocksForTimezone(schedule.actualBlocks, timezoneOffset),
+    [schedule.actualBlocks, timezoneOffset],
+  )
+
   /** Render a read-only day panel (for prev/next in swipe) */
   const renderReadOnlyPanel = (panelSchedule: typeof schedule) => (
     <div className="h-full flex" style={{ width: '33.333%', flexShrink: 0 }}>
@@ -238,11 +251,11 @@ export function DayView({ date, onOpenHistory, onNavigateDate }: Props) {
       <div className="flex-1 flex relative">
         <div className="flex-1 border-r border-slate-200 relative">
           <HourLines slotHeight={slotHeight} />
-          <ReadOnlyBlocks blocks={panelSchedule.idealBlocks} slotHeight={slotHeight} />
+          <ReadOnlyBlocks blocks={adjustBlocksForTimezone(panelSchedule.idealBlocks, timezoneOffset)} slotHeight={slotHeight} />
         </div>
         <div className="flex-1 relative">
           <HourLines slotHeight={slotHeight} />
-          <ReadOnlyBlocks blocks={panelSchedule.actualBlocks} slotHeight={slotHeight} />
+          <ReadOnlyBlocks blocks={adjustBlocksForTimezone(panelSchedule.actualBlocks, timezoneOffset)} slotHeight={slotHeight} />
         </div>
       </div>
     </div>
@@ -295,7 +308,7 @@ export function DayView({ date, onOpenHistory, onNavigateDate }: Props) {
             <div className="flex-1 flex relative">
               <div className="flex-1 border-r border-slate-200 relative">
                 <TimeGrid
-                  blocks={schedule.idealBlocks}
+                  blocks={adjustedIdealBlocks}
                   slotHeight={slotHeight}
                   onSlotTap={(slot) => handleSlotTap('ideal', slot)}
                   onBlockTap={(block) => handleBlockTap('ideal', block)}
@@ -305,7 +318,7 @@ export function DayView({ date, onOpenHistory, onNavigateDate }: Props) {
               </div>
               <div className="flex-1 relative">
                 <TimeGrid
-                  blocks={schedule.actualBlocks}
+                  blocks={adjustedActualBlocks}
                   slotHeight={slotHeight}
                   onSlotTap={(slot) => handleSlotTap('actual', slot)}
                   onBlockTap={(block) => handleBlockTap('actual', block)}

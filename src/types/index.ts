@@ -5,6 +5,7 @@ export type TimeBlock = {
   startTime: number // 0〜287（5分刻み: 0:00=0, 0:05=1, ..., 23:55=287）
   endTime: number   // 同上（startTime < endTime）
   color: string     // 表示色（例: "#4A90D9"）
+  timezoneOffset?: number // 作成時のUTCオフセット（分）。未設定の場合は現在のタイムゾーンとして扱う
 }
 
 // ===== 1日のスケジュール =====
@@ -104,6 +105,40 @@ export function getTodayInTimezone(offsetMinutes: number): string {
   const utcMs = now.getTime() + now.getTimezoneOffset() * 60_000
   const adjusted = new Date(utcMs + offsetMinutes * 60_000)
   return formatDate(adjusted)
+}
+
+/**
+ * ブロックのスロットをタイムゾーン差分で調整する。
+ * 例: JSTで作成(+540)→HST(-600)に変更 → diff = -600 - 540 = -1140分 = -228スロット
+ * 0〜287の範囲にクランプし、範囲外のブロックはnullを返す。
+ */
+export function adjustBlockForTimezone(
+  block: TimeBlock,
+  currentOffset: number,
+): TimeBlock | null {
+  if (block.timezoneOffset == null) return block // レガシーデータはそのまま
+  const diffMinutes = currentOffset - block.timezoneOffset
+  if (diffMinutes === 0) return block
+  const diffSlots = diffMinutes / 5
+  const newStart = block.startTime + diffSlots
+  const newEnd = block.endTime + diffSlots
+  // 完全に範囲外なら非表示
+  if (newEnd <= 0 || newStart >= SLOT_COUNT) return null
+  return {
+    ...block,
+    startTime: Math.max(0, Math.round(newStart)),
+    endTime: Math.min(SLOT_COUNT, Math.round(newEnd)),
+  }
+}
+
+/** ブロック配列をタイムゾーン調整して返す */
+export function adjustBlocksForTimezone(blocks: TimeBlock[], currentOffset: number): TimeBlock[] {
+  const result: TimeBlock[] = []
+  for (const b of blocks) {
+    const adjusted = adjustBlockForTimezone(b, currentOffset)
+    if (adjusted) result.push(adjusted)
+  }
+  return result
 }
 
 export const IDEAL_COLOR = '#34b870' // 緑（やや鮮やか、白文字映え）
