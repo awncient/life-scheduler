@@ -88,10 +88,10 @@ export function SettingsView({ onBack }: Props) {
         <h1 className="text-base font-medium">設定</h1>
       </div>
 
-      <div className="px-5 pt-6 pb-12 space-y-8 max-w-lg mx-auto">
+      <div className="px-5 pt-8 pb-16 space-y-10 max-w-lg mx-auto">
         {/* 基準時刻 */}
-        <section className="bg-white rounded-xl p-5 shadow-sm">
-          <h2 className="text-sm font-semibold text-gray-700 mb-3">基準時刻（タイムゾーン）</h2>
+        <section className="bg-white rounded-xl px-5 py-6 shadow-sm">
+          <h2 className="text-base font-semibold text-gray-700 mb-4">基準時刻（タイムゾーン）</h2>
           <select
             value={settings.timezoneOffset}
             onChange={handleTimezoneChange}
@@ -101,15 +101,15 @@ export function SettingsView({ onBack }: Props) {
               <option key={opt.value} value={opt.value}>{opt.label}</option>
             ))}
           </select>
-          <p className="text-xs text-gray-500 mt-2">
+          <p className="text-xs text-gray-500 mt-3">
             現在時刻の表示や「今日」の判定に使用されます。
           </p>
         </section>
 
         {/* データの管理 */}
-        <section className="bg-white rounded-xl p-5 shadow-sm">
-          <h2 className="text-sm font-semibold text-gray-700 mb-3">データの管理</h2>
-          <div className="flex flex-col gap-3">
+        <section className="bg-white rounded-xl px-5 py-6 shadow-sm">
+          <h2 className="text-base font-semibold text-gray-700 mb-4">データの管理</h2>
+          <div className="flex flex-col gap-4">
             <Button
               variant="outline"
               className="justify-start gap-2"
@@ -137,8 +137,8 @@ export function SettingsView({ onBack }: Props) {
         </section>
 
         {/* 投げ銭 */}
-        <section className="bg-white rounded-xl p-5 shadow-sm">
-          <h2 className="text-sm font-semibold text-gray-700 mb-3">開発を応援する</h2>
+        <section className="bg-white rounded-xl px-5 py-6 shadow-sm">
+          <h2 className="text-base font-semibold text-gray-700 mb-4">開発を応援する</h2>
           <p className="text-xs text-gray-500 mb-3">
             このアプリが役に立っていたら、ぜひ応援をお願いします！
           </p>

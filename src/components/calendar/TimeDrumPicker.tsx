@@ -3,6 +3,8 @@ import { useRef, useEffect, useCallback } from 'react'
 const ITEM_HEIGHT = 40
 const VISIBLE_ITEMS = 5
 const CENTER_INDEX = Math.floor(VISIBLE_ITEMS / 2)
+// We repeat items 3 times for seamless circular scroll
+const REPEATS = 3
 
 type DrumColumnProps = {
   items: string[]
@@ -20,31 +22,54 @@ function DrumColumn({ items, selectedIndex, onChange }: DrumColumnProps) {
   const lastTime = useRef(0)
   const animFrame = useRef(0)
   const suppressClick = useRef(false)
+  const isRecenteringRef = useRef(false)
 
-  const scrollToIndex = useCallback((index: number, smooth = true) => {
+  const count = items.length
+  // The "home" offset for the middle copy of the repeated list
+  const middleOffset = count * ITEM_HEIGHT
+
+  const scrollToLogicalIndex = useCallback((index: number, smooth = true) => {
     const el = containerRef.current
     if (!el) return
-    const target = index * ITEM_HEIGHT
+    const target = middleOffset + index * ITEM_HEIGHT
     if (smooth) {
       el.scrollTo({ top: target, behavior: 'smooth' })
     } else {
       el.scrollTop = target
     }
-  }, [])
+  }, [middleOffset])
 
-  // Scroll to selected on mount and when selectedIndex changes
+  // On mount / selectedIndex change, jump to middle copy
   useEffect(() => {
-    scrollToIndex(selectedIndex, false)
-  }, [selectedIndex, scrollToIndex])
+    scrollToLogicalIndex(selectedIndex, false)
+  }, [selectedIndex, scrollToLogicalIndex])
+
+  /** Silently recenter to the middle copy without visual jump */
+  const recenter = useCallback(() => {
+    const el = containerRef.current
+    if (!el) return
+    const totalSingle = count * ITEM_HEIGHT
+    const scroll = el.scrollTop
+    // If we've scrolled into the first or last copy, jump to the equivalent in the middle
+    if (scroll < totalSingle * 0.5 || scroll >= totalSingle * 2.5) {
+      isRecenteringRef.current = true
+      const indexInList = Math.round(scroll / ITEM_HEIGHT) % count
+      const normalised = ((indexInList % count) + count) % count
+      el.scrollTop = middleOffset + normalised * ITEM_HEIGHT
+      isRecenteringRef.current = false
+    }
+  }, [count, middleOffset])
 
   const snapToNearest = useCallback(() => {
     const el = containerRef.current
     if (!el) return
-    const index = Math.round(el.scrollTop / ITEM_HEIGHT)
-    const clamped = Math.max(0, Math.min(items.length - 1, index))
-    scrollToIndex(clamped)
-    onChange(clamped)
-  }, [items.length, onChange, scrollToIndex])
+    recenter()
+    const scroll = el.scrollTop
+    const rawIndex = Math.round(scroll / ITEM_HEIGHT)
+    const logicalIndex = ((rawIndex % count) + count) % count
+    scrollToLogicalIndex(logicalIndex)
+    onChange(logicalIndex)
+  }, [count, onChange, scrollToLogicalIndex, recenter])
 
   const handleTouchStart = useCallback((e: React.TouchEvent) => {
     isDragging.current = true
@@ -75,7 +100,6 @@ function DrumColumn({ items, selectedIndex, onChange }: DrumColumnProps) {
 
   const handleTouchEnd = useCallback(() => {
     isDragging.current = false
-    // Apply momentum then snap
     const el = containerRef.current
     if (!el) { snapToNearest(); return }
 
@@ -92,19 +116,17 @@ function DrumColumn({ items, selectedIndex, onChange }: DrumColumnProps) {
     }
   }, [snapToNearest])
 
-  const handleItemClick = useCallback((index: number) => {
+  const handleItemClick = useCallback((logicalIndex: number) => {
     if (suppressClick.current) return
-    scrollToIndex(index)
-    onChange(index)
-  }, [scrollToIndex, onChange])
+    scrollToLogicalIndex(logicalIndex)
+    onChange(logicalIndex)
+  }, [scrollToLogicalIndex, onChange])
 
-  // Handle mouse wheel
   const handleWheel = useCallback((e: React.WheelEvent) => {
     e.stopPropagation()
     const el = containerRef.current
     if (!el) return
     el.scrollTop += e.deltaY
-    // Debounce snap
     cancelAnimationFrame(animFrame.current)
     animFrame.current = requestAnimationFrame(() => {
       setTimeout(snapToNearest, 100)
@@ -113,6 +135,14 @@ function DrumColumn({ items, selectedIndex, onChange }: DrumColumnProps) {
 
   const paddingTop = CENTER_INDEX * ITEM_HEIGHT
   const paddingBottom = (VISIBLE_ITEMS - CENTER_INDEX - 1) * ITEM_HEIGHT
+
+  // Build the tripled items list
+  const repeatedItems: { label: string; logicalIndex: number }[] = []
+  for (let r = 0; r < REPEATS; r++) {
+    for (let i = 0; i < count; i++) {
+      repeatedItems.push({ label: items[i], logicalIndex: i })
+    }
+  }
 
   return (
     <div className="relative" style={{ height: ITEM_HEIGHT * VISIBLE_ITEMS }}>
@@ -132,8 +162,8 @@ function DrumColumn({ items, selectedIndex, onChange }: DrumColumnProps) {
         onWheel={handleWheel}
       >
         <div style={{ paddingTop, paddingBottom }}>
-          {items.map((item, i) => {
-            const isSelected = i === selectedIndex
+          {repeatedItems.map((item, i) => {
+            const isSelected = item.logicalIndex === selectedIndex
             return (
               <div
                 key={i}
@@ -141,9 +171,9 @@ function DrumColumn({ items, selectedIndex, onChange }: DrumColumnProps) {
                   isSelected ? 'text-slate-900 font-bold text-lg' : 'text-slate-400 text-base'
                 }`}
                 style={{ height: ITEM_HEIGHT }}
-                onClick={() => handleItemClick(i)}
+                onClick={() => handleItemClick(item.logicalIndex)}
               >
-                {item}
+                {item.label}
               </div>
             )
           })}

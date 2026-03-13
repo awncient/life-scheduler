@@ -173,11 +173,11 @@ export function BlockEditor({
           {/* Start date + time */}
           <div>
             <button
-              className="w-full flex items-center justify-between px-3 py-2.5 border border-slate-200 rounded-lg text-sm hover:bg-slate-50 transition-colors"
+              className="w-full flex items-center justify-between px-4 py-3.5 border border-slate-200 rounded-lg hover:bg-slate-50 transition-colors"
               onClick={() => { setShowStartPicker(!showStartPicker); setShowEndPicker(false) }}
             >
-              <span className="text-slate-500 text-xs">開始</span>
-              <span className="font-medium">
+              <span className="text-slate-500 text-sm">開始</span>
+              <span className="font-medium text-sm">
                 {formatDateLabel(startDate)}&ensp;{startTimeStr}
               </span>
               {showStartPicker ? <ChevronUp className="h-4 w-4 text-slate-400" /> : <ChevronDown className="h-4 w-4 text-slate-400" />}
@@ -205,11 +205,11 @@ export function BlockEditor({
           {/* End date + time */}
           <div>
             <button
-              className="w-full flex items-center justify-between px-3 py-2.5 border border-slate-200 rounded-lg text-sm hover:bg-slate-50 transition-colors"
+              className="w-full flex items-center justify-between px-4 py-3.5 border border-slate-200 rounded-lg hover:bg-slate-50 transition-colors"
               onClick={() => { setShowEndPicker(!showEndPicker); setShowStartPicker(false) }}
             >
-              <span className="text-slate-500 text-xs">終了</span>
-              <span className="font-medium">
+              <span className="text-slate-500 text-sm">終了</span>
+              <span className="font-medium text-sm">
                 {formatDateLabel(endDate)}&ensp;{endTimeStr}
               </span>
               {showEndPicker ? <ChevronUp className="h-4 w-4 text-slate-400" /> : <ChevronDown className="h-4 w-4 text-slate-400" />}
