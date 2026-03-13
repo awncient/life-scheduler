@@ -151,8 +151,8 @@ function DrumColumn({ items, selectedIndex, onChange }: DrumColumnProps) {
           return (
             <div
               key={i}
-              className={`flex items-center justify-center cursor-pointer select-none transition-colors ${
-                isSelected ? 'text-slate-900 font-bold text-lg' : 'text-slate-400 text-base'
+              className={`flex items-center justify-center cursor-pointer select-none transition-colors text-base ${
+                isSelected ? 'text-slate-900' : 'text-slate-400'
               }`}
               style={{ height: ITEM_HEIGHT }}
               onClick={() => handleItemClick(item.logicalIndex)}
@@ -186,29 +186,35 @@ export function TimeDrumPicker({ hours, minutes, onChange }: Props) {
         className="absolute left-0 right-0 bg-slate-100 rounded-lg pointer-events-none"
         style={{ top: CENTER_INDEX * ITEM_HEIGHT, height: ITEM_HEIGHT, zIndex: 0 }}
       />
-      {/* Two scrollable columns */}
-      <div className="flex h-full relative" style={{ zIndex: 1 }}>
-        <div className="flex-1">
-          <DrumColumn
-            items={HOURS}
-            selectedIndex={hours}
-            onChange={(i) => onChange(i, minutes)}
-          />
+      {/* Two scrollable columns pushed toward center */}
+      <div className="flex h-full relative items-stretch" style={{ zIndex: 1 }}>
+        {/* Left half: tapping/scrolling here controls hours */}
+        <div className="flex-1 flex justify-end">
+          <div style={{ width: 56 }}>
+            <DrumColumn
+              items={HOURS}
+              selectedIndex={hours}
+              onChange={(i) => onChange(i, minutes)}
+            />
+          </div>
         </div>
-        <div className="flex-1">
-          <DrumColumn
-            items={MINUTES_5}
-            selectedIndex={minuteIndex}
-            onChange={(i) => onChange(hours, i * 5)}
-          />
+        {/* Colon */}
+        <div
+          className="flex items-center justify-center text-base text-slate-400 pointer-events-none"
+          style={{ width: 16, marginTop: CENTER_INDEX * ITEM_HEIGHT, height: ITEM_HEIGHT }}
+        >
+          :
         </div>
-      </div>
-      {/* Colon separator */}
-      <div
-        className="absolute left-1/2 -translate-x-1/2 text-xl font-bold text-slate-400 pointer-events-none flex items-center justify-center"
-        style={{ top: CENTER_INDEX * ITEM_HEIGHT, height: ITEM_HEIGHT, zIndex: 2 }}
-      >
-        :
+        {/* Right half: tapping/scrolling here controls minutes */}
+        <div className="flex-1 flex justify-start">
+          <div style={{ width: 56 }}>
+            <DrumColumn
+              items={MINUTES_5}
+              selectedIndex={minuteIndex}
+              onChange={(i) => onChange(hours, i * 5)}
+            />
+          </div>
+        </div>
       </div>
       {/* Fade masks */}
       <div className="absolute top-0 left-0 right-0 h-10 bg-gradient-to-b from-white to-transparent pointer-events-none" style={{ zIndex: 3 }} />
