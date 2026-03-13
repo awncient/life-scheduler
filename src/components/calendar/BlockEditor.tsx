@@ -174,7 +174,7 @@ export function BlockEditor({
           {/* Start date + time */}
           <div>
             <button
-              className="w-full flex items-center justify-between px-4 py-4 border border-slate-200 rounded-lg hover:bg-slate-50 transition-colors"
+              className="w-full flex items-center justify-between px-4 py-5 border border-slate-200 rounded-lg hover:bg-slate-50 transition-colors"
               onClick={() => { setShowStartPicker(!showStartPicker); setShowEndPicker(false) }}
             >
               <span className="text-slate-500 text-base">開始</span>
@@ -206,7 +206,7 @@ export function BlockEditor({
           {/* End date + time */}
           <div>
             <button
-              className="w-full flex items-center justify-between px-4 py-4 border border-slate-200 rounded-lg hover:bg-slate-50 transition-colors"
+              className="w-full flex items-center justify-between px-4 py-5 border border-slate-200 rounded-lg hover:bg-slate-50 transition-colors"
               onClick={() => { setShowEndPicker(!showEndPicker); setShowStartPicker(false) }}
             >
               <span className="text-slate-500 text-base">終了</span>

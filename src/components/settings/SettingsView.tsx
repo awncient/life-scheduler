@@ -88,42 +88,42 @@ export function SettingsView({ onBack }: Props) {
         <h1 className="text-base font-medium">設定</h1>
       </div>
 
-      <div className="px-5 pt-10 pb-20 space-y-8 max-w-lg mx-auto">
+      <div className="px-5 pt-8 pb-16 max-w-lg mx-auto flex flex-col gap-6">
         {/* 基準時刻 */}
-        <section className="bg-white rounded-xl px-6 py-7 shadow-sm">
-          <h2 className="text-base font-bold text-gray-800 mb-5">基準時刻（タイムゾーン）</h2>
+        <section className="bg-white rounded-xl p-5 shadow-sm">
+          <h2 className="text-sm font-semibold text-gray-700 mb-3">基準時刻（タイムゾーン）</h2>
           <select
             value={settings.timezoneOffset}
             onChange={handleTimezoneChange}
-            className="w-full border border-gray-300 rounded-lg px-4 py-3 text-base bg-white focus:outline-none focus:ring-2 focus:ring-slate-400"
+            className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-slate-400"
           >
             {TIMEZONE_OPTIONS.map(opt => (
               <option key={opt.value} value={opt.value}>{opt.label}</option>
             ))}
           </select>
-          <p className="text-sm text-gray-500 mt-4">
+          <p className="text-xs text-gray-500 mt-2">
             現在時刻の表示や「今日」の判定に使用されます。
           </p>
         </section>
 
         {/* データの管理 */}
-        <section className="bg-white rounded-xl px-6 py-7 shadow-sm">
-          <h2 className="text-base font-bold text-gray-800 mb-5">データの管理</h2>
-          <div className="flex flex-col gap-4">
+        <section className="bg-white rounded-xl p-5 shadow-sm">
+          <h2 className="text-sm font-semibold text-gray-700 mb-3">データの管理</h2>
+          <div className="flex flex-col gap-2">
             <Button
               variant="outline"
-              className="justify-start gap-3 h-12 text-base"
+              className="justify-start gap-2"
               onClick={() => downloadJSON()}
             >
-              <Download className="h-5 w-5" />
+              <Download className="h-4 w-4" />
               JSONエクスポート
             </Button>
             <Button
               variant="outline"
-              className="justify-start gap-3 h-12 text-base"
+              className="justify-start gap-2"
               onClick={() => fileInputRef.current?.click()}
             >
-              <Upload className="h-5 w-5" />
+              <Upload className="h-4 w-4" />
               JSONインポート
             </Button>
           </div>
@@ -137,9 +137,9 @@ export function SettingsView({ onBack }: Props) {
         </section>
 
         {/* 投げ銭 */}
-        <section className="bg-white rounded-xl px-6 py-7 shadow-sm">
-          <h2 className="text-base font-bold text-gray-800 mb-5">開発を応援する</h2>
-          <p className="text-sm text-gray-500 mb-4">
+        <section className="bg-white rounded-xl p-5 shadow-sm">
+          <h2 className="text-sm font-semibold text-gray-700 mb-3">開発を応援する</h2>
+          <p className="text-xs text-gray-500 mb-3">
             このアプリが役に立っていたら、ぜひ応援をお願いします！
           </p>
           <a
@@ -147,7 +147,7 @@ export function SettingsView({ onBack }: Props) {
             target="_blank"
             rel="noopener noreferrer"
           >
-            <Button variant="outline" className="justify-start gap-3 h-12 text-base w-full">
+            <Button variant="outline" className="justify-start gap-2 w-full">
               <ExternalLink className="h-4 w-4" />
               投げ銭する（BOOTH）
             </Button>
