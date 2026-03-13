@@ -166,6 +166,7 @@ export function BlockEditor({
               value={title}
               onChange={(e) => setTitle(e.target.value)}
               placeholder="タイトルを入力"
+              className="h-12 text-base"
               autoFocus
             />
           </div>
@@ -173,11 +174,11 @@ export function BlockEditor({
           {/* Start date + time */}
           <div>
             <button
-              className="w-full flex items-center justify-between px-4 py-3.5 border border-slate-200 rounded-lg hover:bg-slate-50 transition-colors"
+              className="w-full flex items-center justify-between px-4 py-4 border border-slate-200 rounded-lg hover:bg-slate-50 transition-colors"
               onClick={() => { setShowStartPicker(!showStartPicker); setShowEndPicker(false) }}
             >
-              <span className="text-slate-500 text-sm">開始</span>
-              <span className="font-medium text-sm">
+              <span className="text-slate-500 text-base">開始</span>
+              <span className="font-medium text-base">
                 {formatDateLabel(startDate)}&ensp;{startTimeStr}
               </span>
               {showStartPicker ? <ChevronUp className="h-4 w-4 text-slate-400" /> : <ChevronDown className="h-4 w-4 text-slate-400" />}
@@ -205,11 +206,11 @@ export function BlockEditor({
           {/* End date + time */}
           <div>
             <button
-              className="w-full flex items-center justify-between px-4 py-3.5 border border-slate-200 rounded-lg hover:bg-slate-50 transition-colors"
+              className="w-full flex items-center justify-between px-4 py-4 border border-slate-200 rounded-lg hover:bg-slate-50 transition-colors"
               onClick={() => { setShowEndPicker(!showEndPicker); setShowStartPicker(false) }}
             >
-              <span className="text-slate-500 text-sm">終了</span>
-              <span className="font-medium text-sm">
+              <span className="text-slate-500 text-base">終了</span>
+              <span className="font-medium text-base">
                 {formatDateLabel(endDate)}&ensp;{endTimeStr}
               </span>
               {showEndPicker ? <ChevronUp className="h-4 w-4 text-slate-400" /> : <ChevronDown className="h-4 w-4 text-slate-400" />}

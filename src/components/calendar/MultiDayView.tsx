@@ -15,12 +15,12 @@ type Props = {
 
 const DAY_NAMES = ['日', '月', '火', '水', '木', '金', '土']
 
-/** For 3-day view: generate 5 consecutive dates (1 buffer + 3 visible + 1 buffer) */
+/** For 3-day view: generate 9 consecutive dates (3 buffer + 3 visible + 3 buffer) */
 function getThreeDayDates(baseDateStr: string): string[] {
   const base = parseDate(baseDateStr)
-  return Array.from({ length: 5 }, (_, i) => {
+  return Array.from({ length: 9 }, (_, i) => {
     const d = new Date(base)
-    d.setDate(base.getDate() + (i - 1)) // -1 to +3
+    d.setDate(base.getDate() + (i - 3)) // -3 to +5
     return formatDate(d)
   })
 }
@@ -121,10 +121,11 @@ function DayHeader({
   )
 }
 
-/** Swipe config for 3-day view: 5 columns, each 1/5 of container, show middle 3 */
+/** Swipe config for 3-day view: 9 columns, each 1/9 of total, show middle 3 */
 const THREE_DAY_SWIPE: SwipeConfig = {
-  baseOffset: '-20%',    // skip 1 buffer column (1/5)
-  stepFraction: 1 / 3,   // snap threshold relative to 1 day column width
+  baseOffset: '-33.333%',  // skip 3 buffer columns (3/9 = 1/3)
+  stepFraction: 1 / 3,     // snap threshold relative to 1 day column width
+  maxSteps: 3,             // allow swiping up to 3 days at once
 }
 
 /** Swipe config for week view: standard 3-panel */
@@ -219,8 +220,8 @@ function ThreeDayLayout({
       <div className="flex border-b border-slate-200 bg-white sticky top-0 z-10">
         <div className="w-10 flex-shrink-0" />
         <div className="flex-1 overflow-hidden">
-          {/* 5 columns, each 1/3 viewport = total 5/3 viewport */}
-          <div className="flex" style={{ width: `${(5 / 3) * 100}%`, ...swipeStyle }}>
+          {/* 9 columns, each 1/3 viewport = total 9/3 = 3x viewport */}
+          <div className="flex" style={{ width: `${(9 / 3) * 100}%`, ...swipeStyle }}>
             {allDates.map((dateStr) => (
               <DayHeader
                 key={dateStr}
@@ -249,9 +250,9 @@ function ThreeDayLayout({
             ))}
           </div>
 
-          {/* 5 day columns */}
+          {/* 9 day columns */}
           <div className="flex-1 overflow-hidden">
-            <div className="flex h-full" style={{ width: `${(5 / 3) * 100}%`, ...swipeStyle }}>
+            <div className="flex h-full" style={{ width: `${(9 / 3) * 100}%`, ...swipeStyle }}>
               {allDates.map((dateStr) => (
                 <DayColumn
                   key={dateStr}

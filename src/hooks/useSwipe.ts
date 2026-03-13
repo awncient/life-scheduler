@@ -9,6 +9,8 @@ export type SwipeConfig = {
   baseOffset: string
   /** Fraction of container width for one step (1 = full width, 1/3 = one column of 3) */
   stepFraction: number
+  /** Maximum number of steps allowed in a single swipe (default 1) */
+  maxSteps?: number
 }
 
 const DEFAULT_CONFIG: SwipeConfig = {
@@ -28,7 +30,7 @@ export function useSwipe(
   viewKey: string,
   config?: SwipeConfig,
 ) {
-  const { baseOffset, stepFraction } = config ?? DEFAULT_CONFIG
+  const { baseOffset, stepFraction, maxSteps = 1 } = config ?? DEFAULT_CONFIG
   const [offsetX, setOffsetX] = useState(0)
   const [isAnimating, setIsAnimating] = useState(false)
 
@@ -90,18 +92,19 @@ export function useSwipe(
       return
     }
 
-    // For multi-column views, snap threshold is relative to one step width
+    // Calculate how many steps to navigate based on swipe distance
     const stepWidth = width * stepFraction
     const ratio = Math.abs(offsetX) / stepWidth
 
     if (ratio > SNAP_THRESHOLD) {
-      // Animate to full step width, then navigate
-      const targetX = offsetX > 0 ? stepWidth : -stepWidth
+      // Determine number of steps: round to nearest, but at least 1, at most maxSteps
+      const steps = Math.min(maxSteps, Math.max(1, Math.round(ratio)))
+      const targetX = offsetX > 0 ? stepWidth * steps : -stepWidth * steps
       setIsAnimating(true)
       setOffsetX(targetX)
 
       setTimeout(() => {
-        const delta = offsetX > 0 ? -1 : 1
+        const delta = offsetX > 0 ? -steps : steps
         onNavigateRef.current(delta)
         // viewKey change will reset via useEffect
       }, ANIM_MS)
@@ -111,7 +114,7 @@ export function useSwipe(
       setOffsetX(0)
       setTimeout(() => setIsAnimating(false), ANIM_MS)
     }
-  }, [offsetX, stepFraction])
+  }, [offsetX, stepFraction, maxSteps])
 
   useEffect(() => {
     const el = containerRef.current
