@@ -65,7 +65,7 @@ function AutoExpandTextarea({
       value={value}
       onChange={(e) => onChange(e.target.value)}
       placeholder={placeholder}
-      className="w-full text-lg px-3 py-3 border border-slate-200 rounded-md resize-none overflow-hidden focus:outline-none focus:ring-2 focus:ring-slate-400"
+      className="w-full text-lg px-3 py-3 border border-slate-200 rounded-md resize-none overflow-hidden focus:outline-none focus:border-blue-400"
       style={{ minHeight: 56 }}
       rows={1}
       autoFocus

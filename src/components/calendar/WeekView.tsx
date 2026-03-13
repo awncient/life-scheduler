@@ -1,5 +1,5 @@
 import { useMemo } from 'react'
-import { formatDate, parseDate, SLOT_COUNT, SLOTS_PER_HOUR, getTodayInTimezone } from '@/types'
+import { formatDate, parseDate, SLOT_COUNT, SLOTS_PER_HOUR, getTodayInTimezone, getNowInTimezone } from '@/types'
 import { getSchedule, getSettings } from '@/lib/storage'
 
 type Props = {
@@ -68,8 +68,24 @@ export function WeekView({ baseDate, onSelectDate }: Props) {
           {/* Day columns (no header — headers are sticky above) */}
           {weekDates.map((dateStr) => {
             const isPast = dateStr < todayStr
+            const isToday = dateStr === todayStr
             const schedule = getSchedule(dateStr)
-            const blocks = isPast ? schedule.actualBlocks : schedule.idealBlocks
+            const tz = getSettings().timezoneOffset
+
+            let blocks: typeof schedule.idealBlocks
+            if (isToday) {
+              const now = getNowInTimezone(tz)
+              const currentHourSlot = now.hours * SLOTS_PER_HOUR
+              const pastActual = schedule.actualBlocks.filter(b => b.endTime <= currentHourSlot)
+              const futureIdeal = schedule.idealBlocks.filter(b => b.startTime >= currentHourSlot)
+              const crossActual = schedule.actualBlocks.filter(b => b.startTime < currentHourSlot && b.endTime > currentHourSlot)
+              const crossIdeal = crossActual.length === 0
+                ? schedule.idealBlocks.filter(b => b.startTime < currentHourSlot && b.endTime > currentHourSlot)
+                : []
+              blocks = [...pastActual, ...crossActual, ...crossIdeal, ...futureIdeal]
+            } else {
+              blocks = isPast ? schedule.actualBlocks : schedule.idealBlocks
+            }
 
             return (
               <div key={dateStr} className="flex-1 border-r border-slate-200 last:border-r-0 min-w-0 relative">
@@ -86,7 +102,7 @@ export function WeekView({ baseDate, onSelectDate }: Props) {
                   return (
                     <div
                       key={block.id}
-                      className="absolute left-0.5 right-0.5 rounded px-0.5 text-white text-[8px] overflow-hidden cursor-pointer"
+                      className="absolute left-0.5 right-0.5 rounded px-0.5 text-white text-xs overflow-hidden cursor-pointer"
                       style={{
                         top: `${top}px`,
                         height: `${height}px`,
@@ -95,7 +111,7 @@ export function WeekView({ baseDate, onSelectDate }: Props) {
                       }}
                       onClick={() => onSelectDate(dateStr)}
                     >
-                      <div className="truncate leading-tight">{block.title || '（タイトルなし）'}</div>
+                      <div className="leading-tight break-words">{block.title || '（タイトルなし）'}</div>
                     </div>
                   )
                 })}

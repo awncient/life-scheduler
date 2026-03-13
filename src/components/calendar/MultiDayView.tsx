@@ -61,12 +61,37 @@ function DayColumn({
   onSelectDate?: (date: string) => void
 }) {
   const isPast = dateStr < todayStr
+  const isToday = dateStr === todayStr
   const schedule = getSchedule(dateStr)
   const tz = getSettings().timezoneOffset
-  const side = isPast ? 'actual' : 'ideal'
-  const ownBlocks = side === 'ideal' ? schedule.idealBlocks : schedule.actualBlocks
+
+  // 今日の場合: 現在時刻（1時間単位）より前は実際、以降は理想を表示
+  let blocks: typeof schedule.idealBlocks
+  if (isToday) {
+    const now = getNowInTimezone(tz)
+    const currentHourSlot = now.hours * SLOTS_PER_HOUR
+    const idealBlocks = schedule.idealBlocks
+    const actualBlocks = schedule.actualBlocks
+
+    // 過去の実際ブロック（現在時刻より前に終わるもの）
+    const pastActual = actualBlocks.filter(b => b.endTime <= currentHourSlot)
+    // 未来の理想ブロック（現在時刻以降に始まるもの）
+    const futureIdeal = idealBlocks.filter(b => b.startTime >= currentHourSlot)
+    // 現在時刻をまたぐブロック: 実際があればそちら、なければ理想
+    const crossActual = actualBlocks.filter(b => b.startTime < currentHourSlot && b.endTime > currentHourSlot)
+    const crossIdeal = crossActual.length === 0
+      ? idealBlocks.filter(b => b.startTime < currentHourSlot && b.endTime > currentHourSlot)
+      : []
+
+    blocks = [...pastActual, ...crossActual, ...crossIdeal, ...futureIdeal]
+  } else {
+    const side = isPast ? 'actual' : 'ideal'
+    blocks = side === 'ideal' ? schedule.idealBlocks : schedule.actualBlocks
+  }
+
   // Include cross-day blocks from previous days
-  const visibleBlocks = getVisibleBlocksForDay(dateStr, ownBlocks, dateStr)
+  const side = isPast ? 'actual' : 'ideal'
+  const visibleBlocks = getVisibleBlocksForDay(dateStr, blocks, dateStr)
   for (let delta = 1; delta <= 3; delta++) {
     const prevD = new Date(parseDate(dateStr))
     prevD.setDate(prevD.getDate() - delta)
@@ -75,8 +100,7 @@ function DayColumn({
     const prevBlocks = side === 'ideal' ? prevSched.idealBlocks : prevSched.actualBlocks
     visibleBlocks.push(...getVisibleBlocksForDay(dateStr, prevBlocks, prevDateStr))
   }
-  const blocks = adjustBlocksForTimezone(visibleBlocks, tz)
-  const isToday = dateStr === todayStr
+  const adjustedBlocks = adjustBlocksForTimezone(visibleBlocks, tz)
 
   return (
     <div className="flex-1 border-r border-slate-200 last:border-r-0 min-w-0 relative">
@@ -87,13 +111,13 @@ function DayColumn({
           style={{ top: `${h * SLOTS_PER_HOUR * slotHeight}px` }}
         />
       ))}
-      {blocks.map((block) => {
+      {adjustedBlocks.map((block) => {
         const top = block.startTime * slotHeight
         const height = Math.max(4, (block.endTime - block.startTime) * slotHeight - 1)
         return (
           <div
             key={block.id}
-            className="absolute left-0.5 right-0.5 rounded px-0.5 text-white text-[8px] overflow-hidden cursor-pointer"
+            className="absolute left-0.5 right-0.5 rounded px-0.5 text-white text-xs overflow-hidden cursor-pointer"
             style={{
               top: `${top}px`,
               height: `${height}px`,
@@ -102,7 +126,7 @@ function DayColumn({
             }}
             onClick={() => onSelectDate?.(dateStr)}
           >
-            <div className="truncate leading-tight">{block.title || '（タイトルなし）'}</div>
+            <div className="leading-tight break-words">{block.title || '（タイトルなし）'}</div>
           </div>
         )
       })}
