@@ -48,6 +48,7 @@ export default function App() {
           setCalendarView={(v) => setCalendarView(v as CalendarView)}
           currentDate={currentDate}
           setCurrentDate={setCurrentDate}
+          onNavigateDate={navigateDate}
         />
       )}
       <main className="flex-1 overflow-hidden">

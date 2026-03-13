@@ -8,6 +8,8 @@ import {
   Calendar,
   Search,
   Settings,
+  ChevronLeft,
+  ChevronRight,
 } from 'lucide-react'
 
 type AppMode = 'calendar' | 'todo' | 'settings'
@@ -20,6 +22,7 @@ type Props = {
   setCalendarView: (view: CalendarView) => void
   currentDate: string
   setCurrentDate: (date: string) => void
+  onNavigateDate?: (delta: number) => void
 }
 
 const DAY_NAMES_JP = ['日', '月', '火', '水', '木', '金', '土']
@@ -31,6 +34,7 @@ export function Header({
   setCalendarView,
   currentDate,
   setCurrentDate,
+  onNavigateDate,
 }: Props) {
   const [searchOpen, setSearchOpen] = useState(false)
 
@@ -73,14 +77,28 @@ export function Header({
           )}
         </div>
 
-        {/* Center: date display (tap to go to today) */}
+        {/* Center: date display with nav arrows */}
         {mode === 'calendar' && (
-          <button
-            className="text-sm font-medium min-w-[100px] text-center"
-            onClick={goToToday}
-          >
-            {dateLabel}
-          </button>
+          <div className="flex items-center gap-1">
+            <button
+              className="p-1 rounded hover:bg-slate-700 active:bg-slate-600 transition-colors"
+              onClick={() => onNavigateDate?.(-1)}
+            >
+              <ChevronLeft className="h-5 w-5" />
+            </button>
+            <button
+              className="text-sm font-medium min-w-[100px] text-center px-1"
+              onClick={goToToday}
+            >
+              {dateLabel}
+            </button>
+            <button
+              className="p-1 rounded hover:bg-slate-700 active:bg-slate-600 transition-colors"
+              onClick={() => onNavigateDate?.(1)}
+            >
+              <ChevronRight className="h-5 w-5" />
+            </button>
+          </div>
         )}
 
         {mode === 'todo' && (

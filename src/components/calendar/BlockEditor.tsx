@@ -166,6 +166,7 @@ export function BlockEditor({
               value={title}
               onChange={(e) => setTitle(e.target.value)}
               placeholder="タイトルを入力"
+              className="h-14 text-lg"
               autoFocus
             />
           </div>
