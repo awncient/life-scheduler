@@ -193,9 +193,9 @@ export function BlockEditor({
         </DialogDescription>
 
         {/* Top bar */}
-        <div className="flex items-center justify-between -mt-1 mb-3">
+        <div className="flex items-center justify-between -mt-1 mb-3 px-1 py-1">
           <button
-            className="text-blue-500 text-sm font-medium px-1 py-1"
+            className="text-blue-500 text-sm font-medium px-2 py-1"
             onClick={onClose}
           >
             キャンセル
@@ -203,7 +203,7 @@ export function BlockEditor({
           <span className="text-xs font-medium text-slate-500">
             {side === 'ideal' ? '理想（予定）' : '実際（記録）'}
           </span>
-          <div className="flex items-center gap-1">
+          <div className="flex items-center gap-3">
             {isEdit && (
               <button
                 className="text-red-500 p-1"
@@ -213,7 +213,7 @@ export function BlockEditor({
               </button>
             )}
             <button
-              className={`text-sm font-semibold px-1 py-1 ${isValidRange ? 'text-blue-500' : 'text-slate-300'}`}
+              className={`text-sm font-semibold px-2 py-1 ${isValidRange ? 'text-blue-500' : 'text-slate-300'}`}
               onClick={handleSave}
               disabled={!isValidRange}
             >

@@ -264,7 +264,8 @@ export function DayView({ date, onOpenHistory, onNavigateDate }: Props) {
     }
   }
 
-  const totalHeight = SLOT_COUNT * slotHeight
+  const bottomPadding = slotHeight * SLOTS_PER_HOUR // 1時間分の余白を24時以降に追加
+  const totalHeight = SLOT_COUNT * slotHeight + bottomPadding
 
   /** Render a read-only day panel (for prev/next in swipe) */
   const renderReadOnlyPanel = (panelDate: string) => {
