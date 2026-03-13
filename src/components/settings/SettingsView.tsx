@@ -80,7 +80,7 @@ export function SettingsView({ onBack }: Props) {
   }
 
   return (
-    <div className="h-full overflow-y-auto bg-gray-50">
+    <div className="h-full overflow-y-auto bg-white">
       <div className="sticky top-0 z-10 flex items-center gap-2 px-4 py-3 bg-slate-800 text-white safe-area-top">
         <button onClick={onBack} className="p-1 rounded hover:bg-slate-700 transition-colors">
           <ArrowLeft className="h-5 w-5" />
@@ -88,9 +88,9 @@ export function SettingsView({ onBack }: Props) {
         <h1 className="text-base font-medium">設定</h1>
       </div>
 
-      <div className="px-5 pt-8 pb-16 max-w-lg mx-auto flex flex-col gap-6">
+      <div className="px-5 pt-8 pb-16 max-w-lg mx-auto flex flex-col gap-8">
         {/* 基準時刻 */}
-        <section className="bg-white rounded-xl p-5 shadow-sm">
+        <section>
           <h2 className="text-sm font-semibold text-gray-700 mb-3">基準時刻（タイムゾーン）</h2>
           <select
             value={settings.timezoneOffset}
@@ -106,8 +106,10 @@ export function SettingsView({ onBack }: Props) {
           </p>
         </section>
 
+        <hr className="border-gray-200" />
+
         {/* データの管理 */}
-        <section className="bg-white rounded-xl p-5 shadow-sm">
+        <section>
           <h2 className="text-sm font-semibold text-gray-700 mb-3">データの管理</h2>
           <div className="flex flex-col gap-2">
             <Button
@@ -136,8 +138,10 @@ export function SettingsView({ onBack }: Props) {
           />
         </section>
 
+        <hr className="border-gray-200" />
+
         {/* 投げ銭 */}
-        <section className="bg-white rounded-xl p-5 shadow-sm">
+        <section>
           <h2 className="text-sm font-semibold text-gray-700 mb-3">開発を応援する</h2>
           <p className="text-xs text-gray-500 mb-3">
             このアプリが役に立っていたら、ぜひ応援をお願いします！
