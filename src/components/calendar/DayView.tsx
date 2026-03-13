@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import type { TimeBlock } from '@/types'
-import { SLOT_COUNT, SLOTS_PER_HOUR, DEFAULT_SETTINGS, IDEAL_COLOR, ACTUAL_COLOR, formatDate, parseDate } from '@/types'
+import { SLOT_COUNT, SLOTS_PER_HOUR, DEFAULT_SETTINGS, IDEAL_COLOR, ACTUAL_COLOR, formatDate, parseDate, getNowInTimezone, getTodayInTimezone } from '@/types'
 import { useBlocks } from '@/hooks/useBlocks'
 import { usePinchZoom } from '@/hooks/usePinchZoom'
 import { useSwipe } from '@/hooks/useSwipe'
@@ -100,7 +100,8 @@ export function DayView({ date, onOpenHistory, onNavigateDate }: Props) {
   const [defaultSlot, setDefaultSlot] = useState(0)
 
   const didScroll = useRef(false)
-  const isToday = date === formatDate(new Date())
+  const timezoneOffset = getSettings().timezoneOffset
+  const isToday = date === getTodayInTimezone(timezoneOffset)
 
   useEffect(() => {
     persistZoom(zoomLevel)
@@ -111,8 +112,8 @@ export function DayView({ date, onOpenHistory, onNavigateDate }: Props) {
     if (didScroll.current) return
     const el = containerRef.current
     if (!el) return
-    const now = new Date()
-    const currentSlot = now.getHours() * SLOTS_PER_HOUR + Math.floor(now.getMinutes() / 5)
+    const now = getNowInTimezone(timezoneOffset)
+    const currentSlot = now.hours * SLOTS_PER_HOUR + Math.floor(now.minutes / 5)
     const currentPos = currentSlot * slotHeight
     const viewHeight = el.clientHeight
     el.scrollTop = Math.max(0, currentPos - viewHeight / 3)

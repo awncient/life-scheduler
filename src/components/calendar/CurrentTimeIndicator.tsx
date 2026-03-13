@@ -1,13 +1,15 @@
 import { useState, useEffect } from 'react'
-import { SLOTS_PER_HOUR } from '@/types'
+import { SLOTS_PER_HOUR, getNowInTimezone } from '@/types'
+import { getSettings } from '@/lib/storage'
 
 type Props = {
   slotHeight: number
 }
 
 function getCurrentSlotFraction(): number {
-  const now = new Date()
-  return now.getHours() * SLOTS_PER_HOUR + now.getMinutes() / 5
+  const offset = getSettings().timezoneOffset
+  const now = getNowInTimezone(offset)
+  return now.hours * SLOTS_PER_HOUR + now.minutes / 5
 }
 
 export function CurrentTimeIndicator({ slotHeight }: Props) {

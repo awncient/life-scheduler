@@ -37,6 +37,7 @@ export type MonthlyTodo = {
 // ===== アプリ設定 =====
 export type AppSettings = {
   zoomLevel: number // スロット高さ (px/5min) 2〜12, default: 5
+  timezoneOffset: number // UTCからのオフセット（分）。例: JST=540, UTC=0。デフォルトはブラウザのローカル
 }
 
 // ===== エクスポート用ルート =====
@@ -89,9 +90,26 @@ export function generateId(): string {
   return crypto.randomUUID()
 }
 
+/** 設定されたタイムゾーンオフセットで「今」の時・分を返す */
+export function getNowInTimezone(offsetMinutes: number): { hours: number; minutes: number } {
+  const now = new Date()
+  const utcMs = now.getTime() + now.getTimezoneOffset() * 60_000
+  const adjusted = new Date(utcMs + offsetMinutes * 60_000)
+  return { hours: adjusted.getHours(), minutes: adjusted.getMinutes() }
+}
+
+/** 設定されたタイムゾーンオフセットで「今日」のYYYY-MM-DD文字列を返す */
+export function getTodayInTimezone(offsetMinutes: number): string {
+  const now = new Date()
+  const utcMs = now.getTime() + now.getTimezoneOffset() * 60_000
+  const adjusted = new Date(utcMs + offsetMinutes * 60_000)
+  return formatDate(adjusted)
+}
+
 export const IDEAL_COLOR = '#34b870' // 緑（やや鮮やか、白文字映え）
 export const ACTUAL_COLOR = '#e8546a' // ローズ（やや鮮やか、白文字映え）
 
 export const DEFAULT_SETTINGS: AppSettings = {
   zoomLevel: 5,
+  timezoneOffset: -(new Date().getTimezoneOffset()), // ブラウザのローカルタイムゾーン
 }

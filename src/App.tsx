@@ -1,20 +1,24 @@
 import { useState, useCallback } from 'react'
-import { formatDate, parseDate } from '@/types'
+import { formatDate, parseDate, getTodayInTimezone } from '@/types'
+import { getSettings } from '@/lib/storage'
 import { Header } from '@/components/layout/Header'
 import { DayView } from '@/components/calendar/DayView'
 import { MultiDayView } from '@/components/calendar/MultiDayView'
 import { VersionHistoryView } from '@/components/calendar/VersionHistory'
 import { TodoView } from '@/components/todo/TodoView'
+import { SettingsView } from '@/components/settings/SettingsView'
 
-type AppMode = 'calendar' | 'todo'
+type AppMode = 'calendar' | 'todo' | 'settings'
 type CalendarView = 'day' | 'three' | 'week' | 'history'
 
 export default function App() {
   const [mode, setMode] = useState<AppMode>('calendar')
   const [calendarView, setCalendarView] = useState<CalendarView>('day')
-  const [currentDate, setCurrentDate] = useState(() => formatDate(new Date()))
+  const [currentDate, setCurrentDate] = useState(() => getTodayInTimezone(getSettings().timezoneOffset))
 
-  const showHeader = !(mode === 'calendar' && calendarView === 'history')
+  const [prevMode, setPrevMode] = useState<'calendar' | 'todo'>('calendar')
+
+  const showHeader = mode !== 'settings' && !(mode === 'calendar' && calendarView === 'history')
 
   const navigateDate = useCallback((delta: number) => {
     setCurrentDate(prev => {
@@ -34,7 +38,12 @@ export default function App() {
       {showHeader && (
         <Header
           mode={mode}
-          setMode={setMode}
+          setMode={(m) => {
+            if (m === 'settings') {
+              setPrevMode(mode as 'calendar' | 'todo')
+            }
+            setMode(m)
+          }}
           calendarView={calendarView}
           setCalendarView={(v) => setCalendarView(v as CalendarView)}
           currentDate={currentDate}
@@ -78,6 +87,9 @@ export default function App() {
           />
         )}
         {mode === 'todo' && <TodoView />}
+        {mode === 'settings' && (
+          <SettingsView onBack={() => setMode(prevMode)} />
+        )}
       </main>
     </div>
   )

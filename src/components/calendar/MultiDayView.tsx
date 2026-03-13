@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useRef, useCallback } from 'react'
-import { formatDate, parseDate, slotToTime, SLOT_COUNT, SLOTS_PER_HOUR, DEFAULT_SETTINGS } from '@/types'
+import { formatDate, parseDate, slotToTime, SLOT_COUNT, SLOTS_PER_HOUR, DEFAULT_SETTINGS, getTodayInTimezone } from '@/types'
 import { getSchedule, getSettings } from '@/lib/storage'
 import { usePinchZoom } from '@/hooks/usePinchZoom'
 import { useSwipe } from '@/hooks/useSwipe'
@@ -138,7 +138,7 @@ function DayHeaders({
 }
 
 export function MultiDayView({ baseDate, days, onSelectDate, onNavigateDate }: Props) {
-  const todayStr = formatDate(new Date())
+  const todayStr = getTodayInTimezone(getSettings().timezoneOffset)
 
   const [zoomLevel, setZoomLevel] = useState(loadZoomLevel)
   const { containerRef, persistZoom } = usePinchZoom(zoomLevel, setZoomLevel)

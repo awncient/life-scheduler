@@ -1,5 +1,5 @@
 import { useMemo } from 'react'
-import { formatDate, parseDate, SLOT_COUNT, SLOTS_PER_HOUR } from '@/types'
+import { formatDate, parseDate, SLOT_COUNT, SLOTS_PER_HOUR, getTodayInTimezone } from '@/types'
 import { getSchedule, getSettings } from '@/lib/storage'
 
 type Props = {
@@ -24,7 +24,7 @@ function getWeekDates(baseDateStr: string): string[] {
 
 export function WeekView({ baseDate, onSelectDate }: Props) {
   const weekDates = useMemo(() => getWeekDates(baseDate), [baseDate])
-  const todayStr = formatDate(new Date())
+  const todayStr = getTodayInTimezone(getSettings().timezoneOffset)
   const slotHeight = getSettings().zoomLevel / 2
 
   return (
