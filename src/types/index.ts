@@ -3,9 +3,11 @@ export type TimeBlock = {
   id: string
   title: string
   startTime: number // 0〜287（5分刻み: 0:00=0, 0:05=1, ..., 23:55=287）
-  endTime: number   // 同上（startTime < endTime）
+  endTime: number   // 同上
   color: string     // 表示色（例: "#4A90D9"）
-  timezoneOffset?: number // 作成時のUTCオフセット（分）。未設定の場合は現在のタイムゾーンとして扱う
+  timezoneOffset?: number // 作成時のUTCオフセット（分）
+  startDate?: string // ブロックの開始日 (YYYY-MM-DD)。日跨ぎブロック用
+  endDate?: string   // ブロックの終了日 (YYYY-MM-DD)。未設定=同日
 }
 
 // ===== 1日のスケジュール =====
@@ -137,6 +139,46 @@ export function adjustBlocksForTimezone(blocks: TimeBlock[], currentOffset: numb
   for (const b of blocks) {
     const adjusted = adjustBlockForTimezone(b, currentOffset)
     if (adjusted) result.push(adjusted)
+  }
+  return result
+}
+
+/**
+ * 指定日に表示すべきブロックの「見た目のstartTime/endTime」を返す。
+ * 日跨ぎブロック（endDateが設定されている）を考慮:
+ * - 開始日: startTime ~ 288
+ * - 中間日: 0 ~ 288
+ * - 終了日: 0 ~ endTime
+ * sourceDate/sourceIdを付与して元ブロックを追跡可能にする。
+ */
+export function getVisibleBlocksForDay(
+  dateStr: string,
+  blocks: TimeBlock[],
+  scheduleDate: string,
+): TimeBlock[] {
+  const result: TimeBlock[] = []
+  for (const block of blocks) {
+    const blockStart = block.startDate || scheduleDate
+    const blockEnd = block.endDate || scheduleDate
+
+    if (dateStr < blockStart || dateStr > blockEnd) continue
+
+    let visibleStart = 0
+    let visibleEnd = SLOT_COUNT
+
+    if (dateStr === blockStart) visibleStart = block.startTime
+    if (dateStr === blockEnd) visibleEnd = block.endTime
+
+    if (visibleStart < visibleEnd) {
+      result.push({
+        ...block,
+        startTime: visibleStart,
+        endTime: visibleEnd,
+        // Preserve original data for editing
+        startDate: blockStart,
+        endDate: blockEnd !== blockStart ? blockEnd : undefined,
+      })
+    }
   }
   return result
 }

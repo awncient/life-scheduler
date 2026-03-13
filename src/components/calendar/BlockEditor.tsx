@@ -9,7 +9,8 @@ import {
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { TimeDrumPicker } from './TimeDrumPicker'
-import { Copy, X, Trash2, ChevronDown, ChevronUp } from 'lucide-react'
+import { MonthCalendar } from './MonthCalendar'
+import { Copy, X, Trash2 } from 'lucide-react'
 
 type SaveData = Omit<TimeBlock, 'id'> & { endDate?: string }
 
@@ -21,7 +22,7 @@ type Props = {
   date: string
   side: 'ideal' | 'actual'
   onSave: (data: SaveData) => void
-  onUpdate?: (id: string, data: Partial<TimeBlock>) => void
+  onUpdate?: (id: string, data: Partial<TimeBlock> & { endDate?: string }) => void
   onDelete?: (id: string) => void
   onCopyToActual?: (block: TimeBlock) => void
 }
@@ -30,8 +31,14 @@ const DAY_NAMES_JP = ['日', '月', '火', '水', '木', '金', '土']
 
 function formatDateLabel(dateStr: string): string {
   const d = parseDate(dateStr)
-  return `${d.getMonth() + 1}月${d.getDate()}日（${DAY_NAMES_JP[d.getDay()]}）`
+  return `${d.getMonth() + 1}月${d.getDate()}日 (${DAY_NAMES_JP[d.getDay()]})`
 }
+
+function formatTimeLabel(h: number, m: number): string {
+  return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}`
+}
+
+type PickerState = null | 'startDate' | 'startTime' | 'endDate' | 'endTime'
 
 export function BlockEditor({
   open,
@@ -53,15 +60,16 @@ export function BlockEditor({
   const [startMinutes, setStartMinutes] = useState(0)
   const [endHours, setEndHours] = useState(1)
   const [endMinutes, setEndMinutes] = useState(0)
-  const [showStartPicker, setShowStartPicker] = useState(false)
-  const [showEndPicker, setShowEndPicker] = useState(false)
+  const [activePicker, setActivePicker] = useState<PickerState>(null)
 
   useEffect(() => {
     if (open) {
       if (block) {
         setTitle(block.title)
-        setStartDate(date)
-        setEndDate(date)
+        const blockStartDate = block.startDate || date
+        const blockEndDate = block.endDate || date
+        setStartDate(blockStartDate)
+        setEndDate(blockEndDate)
         const st = slotToTime(block.startTime)
         const et = slotToTime(block.endTime)
         const [sh, sm] = st.split(':').map(Number)
@@ -83,15 +91,14 @@ export function BlockEditor({
         setEndHours(eh)
         setEndMinutes(em)
       }
-      setShowStartPicker(false)
-      setShowEndPicker(false)
+      setActivePicker(null)
     }
   }, [open, block, defaultStartSlot, date])
 
   const color = side === 'ideal' ? IDEAL_COLOR : ACTUAL_COLOR
 
-  const startTimeStr = `${startHours.toString().padStart(2, '0')}:${startMinutes.toString().padStart(2, '0')}`
-  const endTimeStr = `${endHours.toString().padStart(2, '0')}:${endMinutes.toString().padStart(2, '0')}`
+  const startTimeStr = formatTimeLabel(startHours, startMinutes)
+  const endTimeStr = formatTimeLabel(endHours, endMinutes)
 
   const isMultiDay = startDate !== endDate
   const isValidRange = isMultiDay
@@ -105,13 +112,22 @@ export function BlockEditor({
     const end = timeToSlot(endTimeStr)
 
     if (isEdit && onUpdate && block) {
-      // Editing existing block: single-day only (keep simple)
-      onUpdate(block.id, { title: finalTitle, startTime: start, endTime: end, color })
-    } else if (isMultiDay) {
-      // Multi-day: pass endDate to parent for splitting
-      onSave({ title: finalTitle, startTime: start, endTime: end, color, endDate })
+      onUpdate(block.id, {
+        title: finalTitle,
+        startTime: start,
+        endTime: end,
+        color,
+        startDate,
+        endDate: isMultiDay ? endDate : undefined,
+      })
     } else {
-      onSave({ title: finalTitle, startTime: start, endTime: end, color })
+      onSave({
+        title: finalTitle,
+        startTime: start,
+        endTime: end,
+        color,
+        ...(isMultiDay ? { endDate } : {}),
+      })
     }
     onClose()
   }
@@ -128,6 +144,10 @@ export function BlockEditor({
       onCopyToActual(block)
       onClose()
     }
+  }
+
+  const togglePicker = (picker: PickerState) => {
+    setActivePicker(activePicker === picker ? null : picker)
   }
 
   return (
@@ -161,6 +181,7 @@ export function BlockEditor({
         </div>
 
         <div className="space-y-4">
+          {/* Title */}
           <div>
             <Input
               value={title}
@@ -171,30 +192,43 @@ export function BlockEditor({
             />
           </div>
 
-          {/* Start date + time */}
+          {/* Start: date + time */}
           <div>
-            <button
-              className="w-full flex items-center justify-between px-4 border border-slate-200 rounded-lg hover:bg-slate-50 transition-colors"
-              style={{ paddingTop: '1.25rem', paddingBottom: '1.25rem' }}
-              onClick={() => { setShowStartPicker(!showStartPicker); setShowEndPicker(false) }}
-            >
-              <span className="text-slate-500 text-base">開始</span>
-              <span className="font-medium text-base">
-                {formatDateLabel(startDate)}&ensp;{startTimeStr}
-              </span>
-              {showStartPicker ? <ChevronUp className="h-4 w-4 text-slate-400" /> : <ChevronDown className="h-4 w-4 text-slate-400" />}
-            </button>
-            {showStartPicker && (
-              <div className="mt-2 space-y-2">
-                <input
-                  type="date"
-                  value={startDate}
-                  onChange={(e) => {
-                    setStartDate(e.target.value)
-                    if (e.target.value > endDate) setEndDate(e.target.value)
+            <div className="text-xs text-slate-400 mb-1 ml-1">開始</div>
+            <div className="flex gap-2">
+              <button
+                className={`flex-1 text-left px-4 border rounded-lg transition-colors ${
+                  activePicker === 'startDate' ? 'border-blue-400 bg-blue-50' : 'border-slate-200 hover:bg-slate-50'
+                }`}
+                style={{ paddingTop: '0.85rem', paddingBottom: '0.85rem' }}
+                onClick={() => togglePicker('startDate')}
+              >
+                <span className="font-medium text-base">{formatDateLabel(startDate)}</span>
+              </button>
+              <button
+                className={`px-4 border rounded-lg transition-colors min-w-[90px] text-center ${
+                  activePicker === 'startTime' ? 'border-blue-400 bg-blue-50' : 'border-slate-200 hover:bg-slate-50'
+                }`}
+                style={{ paddingTop: '0.85rem', paddingBottom: '0.85rem' }}
+                onClick={() => togglePicker('startTime')}
+              >
+                <span className="font-medium text-base">{startTimeStr}</span>
+              </button>
+            </div>
+            {activePicker === 'startDate' && (
+              <div className="mt-2 border border-slate-200 rounded-lg p-3">
+                <MonthCalendar
+                  selectedDate={startDate}
+                  onSelect={(d) => {
+                    setStartDate(d)
+                    if (d > endDate) setEndDate(d)
+                    setActivePicker(null)
                   }}
-                  className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm"
                 />
+              </div>
+            )}
+            {activePicker === 'startTime' && (
+              <div className="mt-2">
                 <TimeDrumPicker
                   hours={startHours}
                   minutes={startMinutes}
@@ -204,28 +238,43 @@ export function BlockEditor({
             )}
           </div>
 
-          {/* End date + time */}
+          {/* End: date + time */}
           <div>
-            <button
-              className="w-full flex items-center justify-between px-4 border border-slate-200 rounded-lg hover:bg-slate-50 transition-colors"
-              style={{ paddingTop: '1.25rem', paddingBottom: '1.25rem' }}
-              onClick={() => { setShowEndPicker(!showEndPicker); setShowStartPicker(false) }}
-            >
-              <span className="text-slate-500 text-base">終了</span>
-              <span className="font-medium text-base">
-                {formatDateLabel(endDate)}&ensp;{endTimeStr}
-              </span>
-              {showEndPicker ? <ChevronUp className="h-4 w-4 text-slate-400" /> : <ChevronDown className="h-4 w-4 text-slate-400" />}
-            </button>
-            {showEndPicker && (
-              <div className="mt-2 space-y-2">
-                <input
-                  type="date"
-                  value={endDate}
-                  min={startDate}
-                  onChange={(e) => setEndDate(e.target.value)}
-                  className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm"
+            <div className="text-xs text-slate-400 mb-1 ml-1">終了</div>
+            <div className="flex gap-2">
+              <button
+                className={`flex-1 text-left px-4 border rounded-lg transition-colors ${
+                  activePicker === 'endDate' ? 'border-blue-400 bg-blue-50' : 'border-slate-200 hover:bg-slate-50'
+                }`}
+                style={{ paddingTop: '0.85rem', paddingBottom: '0.85rem' }}
+                onClick={() => togglePicker('endDate')}
+              >
+                <span className="font-medium text-base">{formatDateLabel(endDate)}</span>
+              </button>
+              <button
+                className={`px-4 border rounded-lg transition-colors min-w-[90px] text-center ${
+                  activePicker === 'endTime' ? 'border-blue-400 bg-blue-50' : 'border-slate-200 hover:bg-slate-50'
+                }`}
+                style={{ paddingTop: '0.85rem', paddingBottom: '0.85rem' }}
+                onClick={() => togglePicker('endTime')}
+              >
+                <span className="font-medium text-base">{endTimeStr}</span>
+              </button>
+            </div>
+            {activePicker === 'endDate' && (
+              <div className="mt-2 border border-slate-200 rounded-lg p-3">
+                <MonthCalendar
+                  selectedDate={endDate}
+                  minDate={startDate}
+                  onSelect={(d) => {
+                    setEndDate(d)
+                    setActivePicker(null)
+                  }}
                 />
+              </div>
+            )}
+            {activePicker === 'endTime' && (
+              <div className="mt-2">
                 <TimeDrumPicker
                   hours={endHours}
                   minutes={endMinutes}

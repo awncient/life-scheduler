@@ -1,8 +1,7 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import type { TimeBlock } from '@/types'
-import { SLOT_COUNT, SLOTS_PER_HOUR, DEFAULT_SETTINGS, IDEAL_COLOR, ACTUAL_COLOR, formatDate, parseDate, getNowInTimezone, getTodayInTimezone, generateId, adjustBlocksForTimezone } from '@/types'
+import { SLOT_COUNT, SLOTS_PER_HOUR, DEFAULT_SETTINGS, IDEAL_COLOR, ACTUAL_COLOR, formatDate, parseDate, getNowInTimezone, getTodayInTimezone, adjustBlocksForTimezone, getVisibleBlocksForDay } from '@/types'
 import { useBlocks } from '@/hooks/useBlocks'
-import { getSchedule as getStoredSchedule, saveSchedule as saveStoredSchedule } from '@/lib/storage'
 import { usePinchZoom } from '@/hooks/usePinchZoom'
 import { useSwipe } from '@/hooks/useSwipe'
 import { getSettings, getSchedule } from '@/lib/storage'
@@ -34,12 +33,12 @@ function offsetDateStr(dateStr: string, delta: number): string {
 function ReadOnlyBlocks({ blocks, slotHeight }: { blocks: TimeBlock[]; slotHeight: number }) {
   return (
     <>
-      {blocks.map((block) => {
+      {blocks.map((block, i) => {
         const top = block.startTime * slotHeight
         const height = (block.endTime - block.startTime) * slotHeight
         return (
           <div
-            key={block.id}
+            key={`${block.id}-${i}`}
             className="absolute left-0.5 right-0.5 rounded-sm px-1 text-white text-[10px] overflow-hidden"
             style={{
               top: `${top}px`,
@@ -70,6 +69,29 @@ function HourLines({ slotHeight }: { slotHeight: number }) {
       ))}
     </>
   )
+}
+
+/**
+ * Get visible blocks for a date, including cross-day blocks from nearby days.
+ * Checks current day + previous day for blocks that extend into dateStr.
+ */
+function getEffectiveBlocks(dateStr: string, side: 'ideal' | 'actual'): TimeBlock[] {
+  const schedule = getSchedule(dateStr)
+  const ownBlocks = side === 'ideal' ? schedule.idealBlocks : schedule.actualBlocks
+
+  // Blocks stored on this day
+  const result = getVisibleBlocksForDay(dateStr, ownBlocks, dateStr)
+
+  // Check previous days for cross-day blocks extending into this day
+  for (let delta = 1; delta <= 3; delta++) {
+    const prevDateStr = offsetDateStr(dateStr, -delta)
+    const prevSchedule = getSchedule(prevDateStr)
+    const prevBlocks = side === 'ideal' ? prevSchedule.idealBlocks : prevSchedule.actualBlocks
+    const overflow = getVisibleBlocksForDay(dateStr, prevBlocks, prevDateStr)
+    result.push(...overflow)
+  }
+
+  return result
 }
 
 export function DayView({ date, onOpenHistory, onNavigateDate }: Props) {
@@ -124,8 +146,16 @@ export function DayView({ date, onOpenHistory, onNavigateDate }: Props) {
   // Read-only data for side panels
   const prevDate = useMemo(() => offsetDateStr(date, -1), [date])
   const nextDate = useMemo(() => offsetDateStr(date, 1), [date])
-  const prevSchedule = useMemo(() => getSchedule(prevDate), [prevDate])
-  const nextSchedule = useMemo(() => getSchedule(nextDate), [nextDate])
+
+  // Effective blocks including cross-day overflow
+  const visibleIdealBlocks = useMemo(
+    () => adjustBlocksForTimezone(getEffectiveBlocks(date, 'ideal'), timezoneOffset),
+    [date, schedule, timezoneOffset],
+  )
+  const visibleActualBlocks = useMemo(
+    () => adjustBlocksForTimezone(getEffectiveBlocks(date, 'actual'), timezoneOffset),
+    [date, schedule, timezoneOffset],
+  )
 
   const handleSlotTap = (side: 'ideal' | 'actual', slot: number) => {
     setEditorSide(side)
@@ -136,6 +166,7 @@ export function DayView({ date, onOpenHistory, onNavigateDate }: Props) {
 
   const handleBlockTap = (side: 'ideal' | 'actual', block: TimeBlock) => {
     setEditorSide(side)
+    // Pass the original block data including startDate/endDate for editing
     setEditingBlock(block)
     setDefaultSlot(block.startTime)
     setEditorOpen(true)
@@ -168,61 +199,18 @@ export function DayView({ date, onOpenHistory, onNavigateDate }: Props) {
 
   const handleSave = (data: Omit<TimeBlock, 'id'> & { endDate?: string }) => {
     const color = editorSide === 'ideal' ? IDEAL_COLOR : ACTUAL_COLOR
-    const { endDate, ...blockData } = data
-
-    if (endDate && endDate !== date) {
-      // Multi-day block: split across days
-      const addBlock = editorSide === 'ideal' ? addIdealBlock : addActualBlock
-      // First day: startTime to end of day (slot 288)
-      addBlock({ ...blockData, color, endTime: SLOT_COUNT })
-
-      // Middle days: full day (0 to 288)
-      const tz = timezoneOffset
-      let cursor = parseDate(date)
-      cursor.setDate(cursor.getDate() + 1)
-      while (formatDate(cursor) < endDate) {
-        const midDate = formatDate(cursor)
-        const existing = getStoredSchedule(midDate)
-        const newBlock: TimeBlock = {
-          id: generateId(),
-          title: blockData.title,
-          startTime: 0,
-          endTime: SLOT_COUNT,
-          color,
-          timezoneOffset: tz,
-        }
-        if (editorSide === 'ideal') {
-          existing.idealBlocks.push(newBlock)
-        } else {
-          existing.actualBlocks.push(newBlock)
-        }
-        saveStoredSchedule(existing)
-        cursor.setDate(cursor.getDate() + 1)
-      }
-
-      // Last day: start of day (0) to endTime
-      const lastExisting = getStoredSchedule(endDate)
-      const lastBlock: TimeBlock = {
-        id: generateId(),
-        title: blockData.title,
-        startTime: 0,
-        endTime: blockData.endTime,
-        color,
-        timezoneOffset: tz,
-      }
-      if (editorSide === 'ideal') {
-        lastExisting.idealBlocks.push(lastBlock)
-      } else {
-        lastExisting.actualBlocks.push(lastBlock)
-      }
-      saveStoredSchedule(lastExisting)
-    } else {
-      if (editorSide === 'ideal') addIdealBlock({ ...blockData, color })
-      else addActualBlock({ ...blockData, color })
+    const blockData = {
+      ...data,
+      color,
+      startDate: date,
+      endDate: data.endDate,
     }
+
+    if (editorSide === 'ideal') addIdealBlock(blockData)
+    else addActualBlock(blockData)
   }
 
-  const handleUpdate = (id: string, data: Partial<TimeBlock>) => {
+  const handleUpdate = (id: string, data: Partial<TimeBlock> & { endDate?: string }) => {
     if (editorSide === 'ideal') updateIdealBlock(id, data)
     else updateActualBlock(id, data)
   }
@@ -234,36 +222,30 @@ export function DayView({ date, onOpenHistory, onNavigateDate }: Props) {
 
   const totalHeight = SLOT_COUNT * slotHeight
 
-  // Timezone-adjusted blocks for display
-  const adjustedIdealBlocks = useMemo(
-    () => adjustBlocksForTimezone(schedule.idealBlocks, timezoneOffset),
-    [schedule.idealBlocks, timezoneOffset],
-  )
-  const adjustedActualBlocks = useMemo(
-    () => adjustBlocksForTimezone(schedule.actualBlocks, timezoneOffset),
-    [schedule.actualBlocks, timezoneOffset],
-  )
-
   /** Render a read-only day panel (for prev/next in swipe) */
-  const renderReadOnlyPanel = (panelSchedule: typeof schedule) => (
-    <div className="h-full flex" style={{ width: '33.333%', flexShrink: 0 }}>
-      <TimeLabels slotHeight={slotHeight} />
-      <div className="flex-1 flex relative">
-        <div className="flex-1 border-r border-slate-200 relative">
-          <HourLines slotHeight={slotHeight} />
-          <ReadOnlyBlocks blocks={adjustBlocksForTimezone(panelSchedule.idealBlocks, timezoneOffset)} slotHeight={slotHeight} />
-        </div>
-        <div className="flex-1 relative">
-          <HourLines slotHeight={slotHeight} />
-          <ReadOnlyBlocks blocks={adjustBlocksForTimezone(panelSchedule.actualBlocks, timezoneOffset)} slotHeight={slotHeight} />
+  const renderReadOnlyPanel = (panelDate: string) => {
+    const idealBlocks = adjustBlocksForTimezone(getEffectiveBlocks(panelDate, 'ideal'), timezoneOffset)
+    const actualBlocks = adjustBlocksForTimezone(getEffectiveBlocks(panelDate, 'actual'), timezoneOffset)
+    return (
+      <div className="h-full flex" style={{ width: '33.333%', flexShrink: 0 }}>
+        <TimeLabels slotHeight={slotHeight} />
+        <div className="flex-1 flex relative">
+          <div className="flex-1 border-r border-slate-200 relative">
+            <HourLines slotHeight={slotHeight} />
+            <ReadOnlyBlocks blocks={idealBlocks} slotHeight={slotHeight} />
+          </div>
+          <div className="flex-1 relative">
+            <HourLines slotHeight={slotHeight} />
+            <ReadOnlyBlocks blocks={actualBlocks} slotHeight={slotHeight} />
+          </div>
         </div>
       </div>
-    </div>
-  )
+    )
+  }
 
   return (
     <div className="flex flex-col h-full">
-      {/* Column headers — fixed height for both columns */}
+      {/* Column headers */}
       <div className="flex border-b border-slate-200 bg-white sticky top-0 z-10">
         <div className="w-10 flex-shrink-0" />
         <div className="flex-1 flex items-center justify-center text-xs font-medium text-slate-600 py-2 border-r border-slate-200 min-h-[36px]">
@@ -286,7 +268,7 @@ export function DayView({ date, onOpenHistory, onNavigateDate }: Props) {
         </div>
       </div>
 
-      {/* Scrollable time grids — shared scroll container for all 3 panels */}
+      {/* Scrollable time grids */}
       <div
         ref={containerRef}
         className="flex-1 overflow-y-auto overflow-x-hidden"
@@ -299,8 +281,7 @@ export function DayView({ date, onOpenHistory, onNavigateDate }: Props) {
             ...swipeStyle,
           }}
         >
-          {/* Prev day (read-only) */}
-          {renderReadOnlyPanel(prevSchedule)}
+          {renderReadOnlyPanel(prevDate)}
 
           {/* Current day (interactive) */}
           <div className="h-full flex" style={{ width: '33.333%', flexShrink: 0 }}>
@@ -308,7 +289,7 @@ export function DayView({ date, onOpenHistory, onNavigateDate }: Props) {
             <div className="flex-1 flex relative">
               <div className="flex-1 border-r border-slate-200 relative">
                 <TimeGrid
-                  blocks={adjustedIdealBlocks}
+                  blocks={visibleIdealBlocks}
                   slotHeight={slotHeight}
                   onSlotTap={(slot) => handleSlotTap('ideal', slot)}
                   onBlockTap={(block) => handleBlockTap('ideal', block)}
@@ -318,20 +299,18 @@ export function DayView({ date, onOpenHistory, onNavigateDate }: Props) {
               </div>
               <div className="flex-1 relative">
                 <TimeGrid
-                  blocks={adjustedActualBlocks}
+                  blocks={visibleActualBlocks}
                   slotHeight={slotHeight}
                   onSlotTap={(slot) => handleSlotTap('actual', slot)}
                   onBlockTap={(block) => handleBlockTap('actual', block)}
                   onBlockDragEnd={(block, newStart) => handleBlockDragEnd('actual', block, newStart)}
                 />
               </div>
-              {/* Single current time indicator spanning both columns */}
               {isToday && <CurrentTimeIndicator slotHeight={slotHeight} />}
             </div>
           </div>
 
-          {/* Next day (read-only) */}
-          {renderReadOnlyPanel(nextSchedule)}
+          {renderReadOnlyPanel(nextDate)}
         </div>
       </div>
 
