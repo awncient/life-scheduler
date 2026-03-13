@@ -154,7 +154,8 @@ export function MultiDayView({ baseDate, days, onSelectDate, onNavigateDate }: P
   const { containerRef, persistZoom } = usePinchZoom(zoomLevel, setZoomLevel)
   const scale = days === 7 ? 0.5 : 1 / 1.5
   const slotHeight = zoomLevel * scale
-  const totalHeight = SLOT_COUNT * slotHeight
+  const bottomPadding = slotHeight * SLOTS_PER_HOUR
+  const totalHeight = SLOT_COUNT * slotHeight + bottomPadding
 
   const didScroll = useRef(false)
 
@@ -250,9 +251,9 @@ function ThreeDayLayout({
       {/* Scrollable body */}
       <div ref={containerRef} className="flex-1 overflow-y-auto overflow-x-hidden">
         <div className="flex" style={{ height: `${totalHeight}px` }}>
-          {/* Fixed time labels */}
+          {/* Fixed time labels（1:00〜23:00、00:00は非表示） */}
           <div className="relative flex-shrink-0 w-10 text-[10px] text-slate-400">
-            {Array.from({ length: 24 }, (_, h) => (
+            {Array.from({ length: 23 }, (_, i) => i + 1).map((h) => (
               <div
                 key={h}
                 className="absolute right-1 -translate-y-1/2"
@@ -348,7 +349,7 @@ function WeekLayout({
       <div ref={containerRef} className="flex-1 overflow-y-auto overflow-x-hidden">
         <div className="flex" style={{ height: `${totalHeight}px` }}>
           <div className="relative flex-shrink-0 w-10 text-[10px] text-slate-400">
-            {Array.from({ length: 24 }, (_, h) => (
+            {Array.from({ length: 23 }, (_, i) => i + 1).map((h) => (
               <div
                 key={h}
                 className="absolute right-1 -translate-y-1/2"

@@ -78,7 +78,8 @@ function computeLayout(blocks: TimeBlock[]): LayoutInfo[] {
 }
 
 export function TimeLabels({ slotHeight }: { slotHeight: number }) {
-  const hours = Array.from({ length: 24 }, (_, i) => i)
+  // 1:00〜23:00のラベルを表示（00:00は非表示）
+  const hours = Array.from({ length: 23 }, (_, i) => i + 1)
 
   return (
     <div className="relative flex-shrink-0 w-10 text-[10px] text-slate-400">

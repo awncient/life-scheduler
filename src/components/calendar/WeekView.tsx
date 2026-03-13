@@ -51,10 +51,10 @@ export function WeekView({ baseDate, onSelectDate }: Props) {
 
       {/* Scrollable grid area */}
       <div className="flex-1 overflow-auto">
-        <div className="flex" style={{ height: `${SLOT_COUNT * slotHeight}px` }}>
-          {/* Time labels */}
+        <div className="flex" style={{ height: `${SLOT_COUNT * slotHeight + slotHeight * SLOTS_PER_HOUR}px` }}>
+          {/* Time labels（1:00〜23:00、00:00は非表示） */}
           <div className="relative flex-shrink-0 w-8 text-[9px] text-slate-400">
-            {Array.from({ length: 24 }, (_, h) => (
+            {Array.from({ length: 23 }, (_, i) => i + 1).map((h) => (
               <div
                 key={h}
                 className="absolute right-0.5 -translate-y-1/2"

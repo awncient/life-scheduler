@@ -1,73 +1,45 @@
-# React + TypeScript + Vite
+# DayLog
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+「理想」と「実際」を左右に並べて比較できる、スマートフォン最適化のスケジュール管理PWAアプリです。
 
-Currently, two official plugins are available:
+1日の予定（理想）と実際に過ごした時間（実際）を5分刻みで記録し、振り返りに活用できます。
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+## 主な機能
 
-## React Compiler
+- **1日ビュー**: 理想と実際を左右に並べて表示・編集
+- **3日ビュー / 週間ビュー**: 複数日を俯瞰して確認
+- **日跨ぎブロック**: 深夜をまたぐ予定も1つのブロックとして管理
+- **ドラムピッカー**: iOSライクな循環スクロールで時刻を素早く設定
+- **ピンチズーム**: タイムラインの拡大・縮小に対応
+- **スワイプナビゲーション**: 左右スワイプで日付を移動
+- **理想の履歴**: 理想スケジュールのバージョン履歴を自動保存・比較
+- **タイムゾーン対応**: ブロックごとにタイムゾーンオフセットを保持し、旅行先でも正しく表示
+- **検索**: ブロックタイトルで横断検索
+- **データのインポート / エクスポート**: JSON形式でバックアップ・復元
+- **PWA対応**: ホーム画面に追加してネイティブアプリのように使用可能
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+## 使い方
 
-## Expanding the ESLint configuration
+1. Safari（iOS）または Chrome（Android）でアプリのURLを開く
+2. 「ホーム画面に追加」でインストール
+3. ホーム画面のアイコンからアプリを起動
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
+## プライバシー
 
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
+すべてのデータはデバイス内（localStorage）にのみ保存されます。外部サーバーへのデータ送信は一切行いません。
 
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
+## 技術スタック
 
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
-```
+- React + TypeScript
+- Vite（ビルドツール）
+- Tailwind CSS
+- Radix UI
+- vite-plugin-pwa
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+## ソースコード
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
+https://github.com/awncient/life-scheduler
 
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
-```
+## ライセンス
+
+[CC BY-NC 4.0](./LICENSE) — 非営利目的での利用・改変・再配布が可能です。

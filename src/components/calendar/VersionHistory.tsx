@@ -96,7 +96,7 @@ export function VersionHistoryView({ date, onBack }: Props) {
     setSnapshots(updated)
   }
 
-  const totalHeight = SLOT_COUNT * slotHeight
+  const totalHeight = SLOT_COUNT * slotHeight + slotHeight * SLOTS_PER_HOUR
 
   return (
     <div className="flex flex-col h-full">
@@ -122,7 +122,7 @@ export function VersionHistoryView({ date, onBack }: Props) {
             {/* Time labels that scroll vertically with main content */}
             <div className="flex-1 overflow-hidden" id="time-labels-scroll">
               <div className="relative" style={{ height: `${totalHeight}px` }}>
-                {Array.from({ length: 24 }, (_, h) => (
+                {Array.from({ length: 23 }, (_, i) => i + 1).map((h) => (
                   <div
                     key={h}
                     className="absolute right-1 -translate-y-1/2 text-[10px] text-slate-400"
