@@ -157,6 +157,24 @@ export function SettingsView({ onBack }: Props) {
             </Button>
           </a>
         </section>
+
+        <hr className="border-gray-200" />
+
+        {/* プライバシー・ソースコード */}
+        <section>
+          <p className="text-xs text-gray-500 leading-relaxed">
+            すべてのデータはあなたのデバイスにのみ保存されます。<br />
+            外部サーバーへの送信は一切行われません。
+          </p>
+          <p className="text-xs text-gray-500 mt-2">
+            説明書・ソースコード：<a
+              href="https://github.com/awncient/life-scheduler"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-blue-500 underline"
+            >https://github.com/awncient/life-scheduler</a>
+          </p>
+        </section>
       </div>
     </div>
   )

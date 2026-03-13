@@ -90,15 +90,47 @@ function DayColumn({
   }
 
   // Include cross-day blocks from previous days
-  const side = isPast ? 'actual' : 'ideal'
   const visibleBlocks = getVisibleBlocksForDay(dateStr, blocks, dateStr)
-  for (let delta = 1; delta <= 3; delta++) {
-    const prevD = new Date(parseDate(dateStr))
-    prevD.setDate(prevD.getDate() - delta)
-    const prevDateStr = formatDate(prevD)
-    const prevSched = getSchedule(prevDateStr)
-    const prevBlocks = side === 'ideal' ? prevSched.idealBlocks : prevSched.actualBlocks
-    visibleBlocks.push(...getVisibleBlocksForDay(dateStr, prevBlocks, prevDateStr))
+  if (isToday) {
+    const now = getNowInTimezone(tz)
+    const currentHourSlot = now.hours * SLOTS_PER_HOUR
+    // 今日の場合: 前日からの日跨ぎブロックも時間帯で分けて表示
+    for (let delta = 1; delta <= 3; delta++) {
+      const prevD = new Date(parseDate(dateStr))
+      prevD.setDate(prevD.getDate() - delta)
+      const prevDateStr = formatDate(prevD)
+      const prevSched = getSchedule(prevDateStr)
+      // 過去時間帯は実際、未来時間帯は理想
+      const prevActualVisible = getVisibleBlocksForDay(dateStr, prevSched.actualBlocks, prevDateStr)
+      const prevIdealVisible = getVisibleBlocksForDay(dateStr, prevSched.idealBlocks, prevDateStr)
+      for (const b of prevActualVisible) {
+        if (b.endTime <= currentHourSlot || (b.startTime < currentHourSlot && b.endTime > currentHourSlot)) {
+          visibleBlocks.push(b)
+        }
+      }
+      for (const b of prevIdealVisible) {
+        if (b.startTime >= currentHourSlot) {
+          visibleBlocks.push(b)
+        }
+        // 現在をまたぐ理想は、実際がなければ表示
+        if (b.startTime < currentHourSlot && b.endTime > currentHourSlot) {
+          const hasActualCross = prevActualVisible.some(a =>
+            a.startTime < currentHourSlot && a.endTime > currentHourSlot
+          )
+          if (!hasActualCross) visibleBlocks.push(b)
+        }
+      }
+    }
+  } else {
+    const side = isPast ? 'actual' : 'ideal'
+    for (let delta = 1; delta <= 3; delta++) {
+      const prevD = new Date(parseDate(dateStr))
+      prevD.setDate(prevD.getDate() - delta)
+      const prevDateStr = formatDate(prevD)
+      const prevSched = getSchedule(prevDateStr)
+      const prevBlocks = side === 'ideal' ? prevSched.idealBlocks : prevSched.actualBlocks
+      visibleBlocks.push(...getVisibleBlocksForDay(dateStr, prevBlocks, prevDateStr))
+    }
   }
   const adjustedBlocks = adjustBlocksForTimezone(visibleBlocks, tz)
 

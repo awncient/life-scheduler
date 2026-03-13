@@ -193,7 +193,7 @@ export function BlockEditor({
         </DialogDescription>
 
         {/* Top bar */}
-        <div className="flex items-center justify-between mb-3" style={{ paddingTop: 3, paddingBottom: 3, marginLeft: 3, marginRight: 3 }}>
+        <div className="flex items-center justify-between mb-3" style={{ paddingTop: 3, paddingBottom: 3, marginLeft: 5, marginRight: 5 }}>
           <button
             className="text-blue-500 text-sm font-medium px-2 py-1"
             onClick={onClose}

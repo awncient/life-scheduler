@@ -15,6 +15,7 @@ type Props = {
   date: string
   onOpenHistory?: () => void
   onNavigateDate?: (delta: number) => void
+  scrollToSlot?: number | null
 }
 
 function loadZoomLevel(): number {
@@ -94,7 +95,7 @@ function getEffectiveBlocks(dateStr: string, side: 'ideal' | 'actual'): TimeBloc
   return result
 }
 
-export function DayView({ date, onOpenHistory, onNavigateDate }: Props) {
+export function DayView({ date, onOpenHistory, onNavigateDate, scrollToSlot }: Props) {
   const {
     schedule,
     refresh,
@@ -143,6 +144,16 @@ export function DayView({ date, onOpenHistory, onNavigateDate }: Props) {
     el.scrollTop = Math.max(0, currentPos - viewHeight / 3)
     didScroll.current = true
   }, [slotHeight, containerRef])
+
+  // 検索結果からの遷移時: 対象ブロックが画面中央に来るようスクロール
+  useEffect(() => {
+    if (scrollToSlot == null) return
+    const el = containerRef.current
+    if (!el) return
+    const targetPos = scrollToSlot * slotHeight
+    const viewHeight = el.clientHeight
+    el.scrollTop = Math.max(0, targetPos - viewHeight / 2)
+  }, [scrollToSlot, slotHeight, containerRef])
 
   // Read-only data for side panels
   const prevDate = useMemo(() => offsetDateStr(date, -1), [date])

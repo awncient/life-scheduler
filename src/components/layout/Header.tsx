@@ -23,6 +23,7 @@ type Props = {
   currentDate: string
   setCurrentDate: (date: string) => void
   onNavigateDate?: (delta: number) => void
+  onScrollToSlot?: (slot: number) => void
 }
 
 const DAY_NAMES_JP = ['日', '月', '火', '水', '木', '金', '土']
@@ -35,6 +36,7 @@ export function Header({
   currentDate,
   setCurrentDate,
   onNavigateDate,
+  onScrollToSlot,
 }: Props) {
   const [searchOpen, setSearchOpen] = useState(false)
 
@@ -134,10 +136,14 @@ export function Header({
       <SearchModal
         open={searchOpen}
         onClose={() => setSearchOpen(false)}
-        onSelectDate={(date) => {
+        onSelectDate={(date, scrollToSlot) => {
           setCurrentDate(date)
           setCalendarView('day')
           setSearchOpen(false)
+          if (scrollToSlot != null) {
+            // Delay to let DayView mount with new date
+            setTimeout(() => onScrollToSlot?.(scrollToSlot), 100)
+          }
         }}
       />
     </>

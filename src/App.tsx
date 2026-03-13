@@ -15,6 +15,7 @@ export default function App() {
   const [mode, setMode] = useState<AppMode>('calendar')
   const [calendarView, setCalendarView] = useState<CalendarView>('day')
   const [currentDate, setCurrentDate] = useState(() => getTodayInTimezone(getSettings().timezoneOffset))
+  const [scrollToSlot, setScrollToSlot] = useState<number | null>(null)
 
   const [prevMode, setPrevMode] = useState<'calendar' | 'todo'>('calendar')
 
@@ -49,6 +50,7 @@ export default function App() {
           currentDate={currentDate}
           setCurrentDate={setCurrentDate}
           onNavigateDate={navigateDate}
+          onScrollToSlot={(slot) => setScrollToSlot(slot)}
         />
       )}
       <main className="flex-1 overflow-hidden">
@@ -57,6 +59,7 @@ export default function App() {
             date={currentDate}
             onOpenHistory={() => setCalendarView('history')}
             onNavigateDate={navigateDate}
+            scrollToSlot={scrollToSlot}
           />
         )}
         {mode === 'calendar' && calendarView === 'three' && (

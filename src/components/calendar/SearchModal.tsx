@@ -21,7 +21,7 @@ type SearchResult = {
 type Props = {
   open: boolean
   onClose: () => void
-  onSelectDate: (date: string) => void
+  onSelectDate: (date: string, scrollToSlot?: number) => void
 }
 
 export function SearchModal({ open, onClose, onSelectDate }: Props) {
@@ -59,8 +59,9 @@ export function SearchModal({ open, onClose, onSelectDate }: Props) {
     return matches.sort((a, b) => b.date.localeCompare(a.date))
   }, [query])
 
-  const handleSelect = (date: string) => {
-    onSelectDate(date)
+  const handleSelect = (r: SearchResult) => {
+    const slot = Math.floor(parseInt(r.startTime.split(':')[0]) * 12 + parseInt(r.startTime.split(':')[1]) / 5)
+    onSelectDate(r.date, slot)
     onClose()
   }
 
@@ -90,7 +91,7 @@ export function SearchModal({ open, onClose, onSelectDate }: Props) {
             <div
               key={`${r.date}-${r.title}-${r.startTime}-${i}`}
               className="flex items-center justify-between py-2.5 px-2 border-b border-slate-100 cursor-pointer active:bg-slate-50 rounded"
-              onClick={() => handleSelect(r.date)}
+              onClick={() => handleSelect(r)}
             >
               <div>
                 <div className="text-sm font-medium">{r.title || '（タイトルなし）'}</div>
