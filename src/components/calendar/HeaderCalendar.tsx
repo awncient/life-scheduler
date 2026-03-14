@@ -93,7 +93,7 @@ function MonthGrid({
                 onClick={() => onDateTap(dateStr)}
               >
                 <div
-                  className={`w-8 h-8 flex items-center justify-center rounded-full text-sm transition-colors ${
+                  className={`w-8 h-8 flex items-center justify-center rounded-full text-sm ${
                     isToday
                       ? 'text-white font-bold'
                       : isSelected
@@ -147,7 +147,7 @@ function MonthButton({
         color: isSelected ? '#b71c1c' : '#475569',
         fontWeight: isSelected ? 700 : 500,
         border: isSelected ? '1px solid transparent' : '1px solid #cbd5e1',
-        transition: 'background-color 300ms ease, color 300ms ease, font-weight 300ms ease, border-color 300ms ease',
+        transition: 'background-color 300ms ease, color 300ms ease, border-color 300ms ease',
       }}
       onClick={onClick}
     >
@@ -161,15 +161,23 @@ export function HeaderCalendar({ open, currentDate, onSelectDate, onClose }: Pro
   const [viewYear, setViewYear] = useState(selected.getFullYear())
   const [viewMonth, setViewMonth] = useState(selected.getMonth())
 
+  // refで最新のyear/monthを常に参照できるようにする
+  const viewYearRef = useRef(viewYear)
+  const viewMonthRef = useRef(viewMonth)
+  viewYearRef.current = viewYear
+  viewMonthRef.current = viewMonth
+
   const todayStr = getTodayInTimezone(getSettings().timezoneOffset)
 
   // スワイプ状態
   const containerRef = useRef<HTMLDivElement>(null)
+  const slidingRef = useRef<HTMLDivElement>(null)
   const swipeStartX = useRef(0)
   const swipeCurrentX = useRef(0)
   const isSwiping = useRef(false)
   const [translateX, setTranslateX] = useState(0)
   const [isAnimating, setIsAnimating] = useState(false)
+  const pendingSwipeDir = useRef<'left' | 'right' | null>(null)
 
   // 月ボタンリスト：open時の日付を基準に固定生成
   const [anchorYear, setAnchorYear] = useState(selected.getFullYear())
@@ -186,6 +194,8 @@ export function HeaderCalendar({ open, currentDate, onSelectDate, onClose }: Pro
       setAnchorYear(d.getFullYear())
       setAnchorMonth(d.getMonth())
       setTranslateX(0)
+      setIsAnimating(false)
+      pendingSwipeDir.current = null
     }
   }, [open, currentDate])
 
@@ -211,12 +221,11 @@ export function HeaderCalendar({ open, currentDate, onSelectDate, onClose }: Pro
   // カレンダー月変更時に、選択ボタンが見えない場合のみバーをスムーズにスクロール
   const prevViewRef = useRef({ year: viewYear, month: viewMonth })
   useEffect(() => {
-    const prev = prevViewRef.current
+    const p = prevViewRef.current
     prevViewRef.current = { year: viewYear, month: viewMonth }
 
-    // open直後の初期化は無視
     if (!hasScrolledOnOpen.current) return
-    if (prev.year === viewYear && prev.month === viewMonth) return
+    if (p.year === viewYear && p.month === viewMonth) return
 
     const el = monthBarRef.current
     if (!el) return
@@ -229,15 +238,11 @@ export function HeaderCalendar({ open, currentDate, onSelectDate, onClose }: Pro
     const btnLeft = btn.offsetLeft
     const btnRight = btnLeft + btn.clientWidth
 
-    // ボタンが完全に見えていれば何もしない
     if (btnLeft >= barLeft && btnRight <= barRight) return
 
-    // はみ出している方向にスムーズスクロール
     if (btnLeft < barLeft) {
-      // 左にはみ出し → 左にスクロール（ボタンが左端に来るように）
       el.scrollTo({ left: btnLeft - 8, behavior: 'smooth' })
     } else {
-      // 右にはみ出し → 右にスクロール（ボタンが右端に来るように）
       el.scrollTo({ left: btnRight - el.clientWidth + 8, behavior: 'smooth' })
     }
   }, [viewYear, viewMonth])
@@ -246,7 +251,50 @@ export function HeaderCalendar({ open, currentDate, onSelectDate, onClose }: Pro
   const prev = adjacentMonth(viewYear, viewMonth, -1)
   const next = adjacentMonth(viewYear, viewMonth, 1)
 
-  // カレンダースワイプハンドラー
+  // transitionEnd で月を切り替える（タイミングずれ防止）
+  const handleTransitionEnd = useCallback(() => {
+    const dir = pendingSwipeDir.current
+    if (!dir) return
+    pendingSwipeDir.current = null
+
+    // refから最新値を取得して新しい月を計算
+    const curY = viewYearRef.current
+    const curM = viewMonthRef.current
+    let newYear: number, newMonth: number
+    if (dir === 'left') {
+      // 左スワイプ → 次の月
+      newMonth = curM === 11 ? 0 : curM + 1
+      newYear = curM === 11 ? curY + 1 : curY
+    } else {
+      // 右スワイプ → 前の月
+      newMonth = curM === 0 ? 11 : curM - 1
+      newYear = curM === 0 ? curY - 1 : curY
+    }
+
+    // transitionを即座にDOMレベルで無効化してからstateを一括変更
+    const slidingEl = slidingRef.current
+    if (slidingEl) {
+      slidingEl.style.transition = 'none'
+    }
+
+    // 全stateを一括で設定（ネストなし、Reactバッチで1回のレンダー）
+    setIsAnimating(false)
+    setTranslateX(0)
+    setViewYear(newYear)
+    setViewMonth(newMonth)
+
+    // 次フレームでDOM側のtransition overrideを解除
+    requestAnimationFrame(() => {
+      if (slidingEl) {
+        slidingEl.style.transition = ''
+      }
+    })
+  }, [])
+
+  // フォールバック: transitionEndが発火しない場合のタイマー
+  const fallbackTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  // スワイプハンドラー
   const handleTouchStart = useCallback((e: React.TouchEvent) => {
     if (isAnimating) return
     swipeStartX.current = e.touches[0].clientX
@@ -269,41 +317,36 @@ export function HeaderCalendar({ open, currentDate, onSelectDate, onClose }: Pro
 
     if (Math.abs(dx) > 50) {
       const targetX = dx < 0 ? -containerWidth : containerWidth
+      pendingSwipeDir.current = dx < 0 ? 'left' : 'right'
       setTranslateX(targetX)
       setIsAnimating(true)
 
-      setTimeout(() => {
-        // 1. まずtransitionを除去（これだけ先に描画させる）
-        setIsAnimating(false)
-
-        // 2. 次フレームでtranslateXリセットと月切り替えを同時に行う
-        //    transitionが確実に除去された後なのでチラつかない
-        requestAnimationFrame(() => {
-          setTranslateX(0)
-          if (dx < 0) {
-            setViewMonth(m => {
-              if (m === 11) { setViewYear(y => y + 1); return 0 }
-              return m + 1
-            })
-          } else {
-            setViewMonth(m => {
-              if (m === 0) { setViewYear(y => y - 1); return 11 }
-              return m - 1
-            })
-          }
-        })
-      }, 250)
+      // フォールバック（transitionEndが発火しなかった場合）
+      if (fallbackTimerRef.current) clearTimeout(fallbackTimerRef.current)
+      fallbackTimerRef.current = setTimeout(() => {
+        fallbackTimerRef.current = null
+        if (pendingSwipeDir.current) {
+          handleTransitionEnd()
+        }
+      }, 350)
     } else {
       setTranslateX(0)
     }
-  }, [isAnimating])
+  }, [isAnimating, handleTransitionEnd])
+
+  const onSlidingTransitionEnd = useCallback(() => {
+    if (fallbackTimerRef.current) {
+      clearTimeout(fallbackTimerRef.current)
+      fallbackTimerRef.current = null
+    }
+    handleTransitionEnd()
+  }, [handleTransitionEnd])
 
   const handleDateTap = useCallback((dateStr: string) => {
     onSelectDate(dateStr)
     onClose()
   }, [onSelectDate, onClose])
 
-  // 月ボタンタップ：カレンダーのみ切り替え、バーはスクロールしない
   const handleMonthSelect = useCallback((year: number, month: number) => {
     setViewYear(year)
     setViewMonth(month)
@@ -341,12 +384,15 @@ export function HeaderCalendar({ open, currentDate, onSelectDate, onClose }: Pro
           onTouchEnd={handleTouchEnd}
         >
           <div
+            ref={slidingRef}
             className="flex"
             style={{
               transform: `translateX(calc(-33.333% + ${translateX}px))`,
               transition: isAnimating ? 'transform 250ms ease-out' : 'none',
               width: '300%',
+              willChange: isAnimating ? 'transform' : undefined,
             }}
+            onTransitionEnd={onSlidingTransitionEnd}
           >
             <div style={{ width: '33.333%', flexShrink: 0 }}>
               <MonthGrid
