@@ -153,7 +153,7 @@ export function HeaderCalendar({ open, currentDate, onSelectDate, onClose }: Pro
   const monthList = useMemo(() => generateMonthList(viewYear, viewMonth), [viewYear, viewMonth])
   const monthBarRef = useRef<HTMLDivElement>(null)
 
-  // open時のみ月バーの現在月を中央にスクロール
+  // open時のみ月バーの選択月を中央にスクロール
   const hasScrolledOnOpen = useRef(false)
   useEffect(() => {
     if (open) {
@@ -203,6 +203,9 @@ export function HeaderCalendar({ open, currentDate, onSelectDate, onClose }: Pro
       setIsAnimating(true)
 
       setTimeout(() => {
+        // アニメーション完了後に月を切り替えてリセット
+        setIsAnimating(false)
+        setTranslateX(0)
         if (dx < 0) {
           // 左スワイプ → 次の月
           setViewMonth(m => {
@@ -216,8 +219,6 @@ export function HeaderCalendar({ open, currentDate, onSelectDate, onClose }: Pro
             return m - 1
           })
         }
-        setTranslateX(0)
-        setIsAnimating(false)
       }, 250)
     } else {
       // スワイプキャンセル — 元に戻す
@@ -269,13 +270,13 @@ export function HeaderCalendar({ open, currentDate, onSelectDate, onClose }: Pro
           <div
             className="flex"
             style={{
-              transform: `translateX(calc(-100% + ${translateX}px))`,
+              transform: `translateX(calc(-33.333% + ${translateX}px))`,
               transition: isAnimating ? 'transform 250ms ease-out' : 'none',
               width: '300%',
             }}
           >
             {/* 前の月 */}
-            <div className="w-1/3 flex-shrink-0">
+            <div style={{ width: '33.333%', flexShrink: 0 }}>
               <MonthGrid
                 year={prev.year}
                 month={prev.month}
@@ -285,7 +286,7 @@ export function HeaderCalendar({ open, currentDate, onSelectDate, onClose }: Pro
               />
             </div>
             {/* 現在の月 */}
-            <div className="w-1/3 flex-shrink-0">
+            <div style={{ width: '33.333%', flexShrink: 0 }}>
               <MonthGrid
                 year={viewYear}
                 month={viewMonth}
@@ -295,7 +296,7 @@ export function HeaderCalendar({ open, currentDate, onSelectDate, onClose }: Pro
               />
             </div>
             {/* 次の月 */}
-            <div className="w-1/3 flex-shrink-0">
+            <div style={{ width: '33.333%', flexShrink: 0 }}>
               <MonthGrid
                 year={next.year}
                 month={next.month}
@@ -308,10 +309,10 @@ export function HeaderCalendar({ open, currentDate, onSelectDate, onClose }: Pro
         </div>
       </div>
 
-      {/* 月ボタンバー */}
+      {/* 月ボタンバー（境界線なし） */}
       <div
         ref={monthBarRef}
-        className="flex items-center gap-1.5 px-2 py-2 overflow-x-auto border-t border-slate-100"
+        className="flex items-center gap-2 px-2 py-2 overflow-x-auto"
         style={{ scrollbarWidth: 'none', WebkitOverflowScrolling: 'touch' }}
       >
         {monthList.map((item, i) => {
@@ -319,20 +320,27 @@ export function HeaderCalendar({ open, currentDate, onSelectDate, onClose }: Pro
           const showYearLabel = i === 0 || (i > 0 && monthList[i - 1].year !== item.year)
 
           return (
-            <div key={`${item.year}-${item.month}`} className="flex items-center gap-1.5 flex-shrink-0">
+            <div key={`${item.year}-${item.month}`} className="flex items-center gap-2 flex-shrink-0">
               {showYearLabel && (
-                <span className="text-sm font-semibold text-slate-500 px-1">
+                <span className="font-semibold text-slate-500" style={{ fontSize: 15 }}>
                   {item.year}
                 </span>
               )}
               <button
                 data-active={isCurrentView}
-                className={`px-4 py-1.5 rounded-full text-sm font-medium transition-colors flex-shrink-0 ${
+                className={`rounded-full font-medium transition-colors flex-shrink-0 ${
                   isCurrentView
                     ? 'font-bold'
-                    : 'text-slate-600 border border-slate-300 hover:bg-slate-100'
+                    : 'text-slate-600 border border-slate-300'
                 }`}
-                style={isCurrentView ? { backgroundColor: '#fce4ec', color: '#b71c1c' } : undefined}
+                style={{
+                  fontSize: 15,
+                  paddingLeft: 16,
+                  paddingRight: 16,
+                  paddingTop: 6,
+                  paddingBottom: 6,
+                  ...(isCurrentView ? { backgroundColor: '#fce4ec', color: '#b71c1c' } : {}),
+                }}
                 onClick={() => handleMonthSelect(item.year, item.month)}
               >
                 {item.label}
