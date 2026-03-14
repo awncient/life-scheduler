@@ -46,14 +46,14 @@ function adjacentMonth(year: number, month: number, delta: number): { year: numb
   return { year: d.getFullYear(), month: d.getMonth() }
 }
 
-/** 月ボタンバーで表示する月リスト生成（前後24ヶ月） */
-function generateMonthList(centerYear: number, centerMonth: number) {
-  const items: { year: number; month: number; label: string }[] = []
+/** 月ボタンバー用の固定リスト生成（基準月の前後24ヶ月） */
+function generateMonthList(anchorYear: number, anchorMonth: number) {
+  const items: { year: number; month: number; label: string; key: string }[] = []
   for (let offset = -24; offset <= 24; offset++) {
-    const d = new Date(centerYear, centerMonth + offset, 1)
+    const d = new Date(anchorYear, anchorMonth + offset, 1)
     const y = d.getFullYear()
     const m = d.getMonth()
-    items.push({ year: y, month: m, label: `${m + 1}月` })
+    items.push({ year: y, month: m, label: `${m + 1}月`, key: `${y}-${m}` })
   }
   return items
 }
@@ -124,6 +124,38 @@ function MonthGrid({
   )
 }
 
+/** 月ボタン（アニメーション付き） */
+function MonthButton({
+  label,
+  isSelected,
+  onClick,
+}: {
+  label: string
+  isSelected: boolean
+  onClick: () => void
+}) {
+  return (
+    <button
+      className="rounded-full font-medium flex-shrink-0"
+      style={{
+        fontSize: 15,
+        paddingLeft: 16,
+        paddingRight: 16,
+        paddingTop: 6,
+        paddingBottom: 6,
+        backgroundColor: isSelected ? '#fce4ec' : 'transparent',
+        color: isSelected ? '#b71c1c' : '#475569',
+        fontWeight: isSelected ? 700 : 500,
+        border: isSelected ? '1px solid transparent' : '1px solid #cbd5e1',
+        transition: 'background-color 300ms ease, color 300ms ease, font-weight 300ms ease, border-color 300ms ease',
+      }}
+      onClick={onClick}
+    >
+      {label}
+    </button>
+  )
+}
+
 export function HeaderCalendar({ open, currentDate, onSelectDate, onClose }: Props) {
   const selected = parseDate(currentDate)
   const [viewYear, setViewYear] = useState(selected.getFullYear())
@@ -139,43 +171,82 @@ export function HeaderCalendar({ open, currentDate, onSelectDate, onClose }: Pro
   const [translateX, setTranslateX] = useState(0)
   const [isAnimating, setIsAnimating] = useState(false)
 
+  // 月ボタンリスト：open時の日付を基準に固定生成
+  const [anchorYear, setAnchorYear] = useState(selected.getFullYear())
+  const [anchorMonth, setAnchorMonth] = useState(selected.getMonth())
+  const monthList = useMemo(() => generateMonthList(anchorYear, anchorMonth), [anchorYear, anchorMonth])
+  const monthBarRef = useRef<HTMLDivElement>(null)
+
   // open時に現在日付の月にリセット
   useEffect(() => {
     if (open) {
       const d = parseDate(currentDate)
       setViewYear(d.getFullYear())
       setViewMonth(d.getMonth())
+      setAnchorYear(d.getFullYear())
+      setAnchorMonth(d.getMonth())
       setTranslateX(0)
     }
   }, [open, currentDate])
 
-  // 月ボタンリスト
-  const monthList = useMemo(() => generateMonthList(viewYear, viewMonth), [viewYear, viewMonth])
-  const monthBarRef = useRef<HTMLDivElement>(null)
-
-  // open時のみ月バーの選択月を中央にスクロール
+  // open時に月バーの選択月を中央にスクロール
   const hasScrolledOnOpen = useRef(false)
   useEffect(() => {
     if (open) {
       hasScrolledOnOpen.current = false
     }
   }, [open])
+
   useEffect(() => {
     if (!open || !monthBarRef.current || hasScrolledOnOpen.current) return
     hasScrolledOnOpen.current = true
     const el = monthBarRef.current
-    const activeBtn = el.querySelector('[data-active="true"]') as HTMLElement | null
+    const activeBtn = el.querySelector(`[data-month-key="${viewYear}-${viewMonth}"]`) as HTMLElement | null
     if (activeBtn) {
       const scrollLeft = activeBtn.offsetLeft - el.clientWidth / 2 + activeBtn.clientWidth / 2
       el.scrollTo({ left: scrollLeft, behavior: 'instant' })
     }
-  }, [open, viewYear, viewMonth])
+  }, [open, viewYear, viewMonth, anchorYear, anchorMonth])
+
+  // カレンダー月変更時に、選択ボタンが見えない場合のみバーをスムーズにスクロール
+  const prevViewRef = useRef({ year: viewYear, month: viewMonth })
+  useEffect(() => {
+    const prev = prevViewRef.current
+    prevViewRef.current = { year: viewYear, month: viewMonth }
+
+    // open直後の初期化は無視
+    if (!hasScrolledOnOpen.current) return
+    if (prev.year === viewYear && prev.month === viewMonth) return
+
+    const el = monthBarRef.current
+    if (!el) return
+
+    const btn = el.querySelector(`[data-month-key="${viewYear}-${viewMonth}"]`) as HTMLElement | null
+    if (!btn) return
+
+    const barLeft = el.scrollLeft
+    const barRight = barLeft + el.clientWidth
+    const btnLeft = btn.offsetLeft
+    const btnRight = btnLeft + btn.clientWidth
+
+    // ボタンが完全に見えていれば何もしない
+    if (btnLeft >= barLeft && btnRight <= barRight) return
+
+    // はみ出している方向にスムーズスクロール
+    if (btnLeft < barLeft) {
+      // 左にはみ出し → 左にスクロール（ボタンが左端に来るように）
+      el.scrollTo({ left: btnLeft - 8, behavior: 'smooth' })
+    } else {
+      // 右にはみ出し → 右にスクロール（ボタンが右端に来るように）
+      el.scrollTo({ left: btnRight - el.clientWidth + 8, behavior: 'smooth' })
+    }
+  }, [viewYear, viewMonth])
 
   // 前後の月
   const prev = adjacentMonth(viewYear, viewMonth, -1)
   const next = adjacentMonth(viewYear, viewMonth, 1)
 
-  // スワイプハンドラー
+  // カレンダースワイプハンドラー
   const handleTouchStart = useCallback((e: React.TouchEvent) => {
     if (isAnimating) return
     swipeStartX.current = e.touches[0].clientX
@@ -197,23 +268,19 @@ export function HeaderCalendar({ open, currentDate, onSelectDate, onClose }: Pro
     const containerWidth = containerRef.current?.clientWidth ?? 300
 
     if (Math.abs(dx) > 50) {
-      // スワイプ確定 — アニメーションで画面外にスライド
       const targetX = dx < 0 ? -containerWidth : containerWidth
       setTranslateX(targetX)
       setIsAnimating(true)
 
       setTimeout(() => {
-        // アニメーション完了後に月を切り替えてリセット
         setIsAnimating(false)
         setTranslateX(0)
         if (dx < 0) {
-          // 左スワイプ → 次の月
           setViewMonth(m => {
             if (m === 11) { setViewYear(y => y + 1); return 0 }
             return m + 1
           })
         } else {
-          // 右スワイプ → 前の月
           setViewMonth(m => {
             if (m === 0) { setViewYear(y => y - 1); return 11 }
             return m - 1
@@ -221,7 +288,6 @@ export function HeaderCalendar({ open, currentDate, onSelectDate, onClose }: Pro
         }
       }, 250)
     } else {
-      // スワイプキャンセル — 元に戻す
       setTranslateX(0)
     }
   }, [isAnimating])
@@ -231,6 +297,7 @@ export function HeaderCalendar({ open, currentDate, onSelectDate, onClose }: Pro
     onClose()
   }, [onSelectDate, onClose])
 
+  // 月ボタンタップ：カレンダーのみ切り替え、バーはスクロールしない
   const handleMonthSelect = useCallback((year: number, month: number) => {
     setViewYear(year)
     setViewMonth(month)
@@ -275,7 +342,6 @@ export function HeaderCalendar({ open, currentDate, onSelectDate, onClose }: Pro
               width: '300%',
             }}
           >
-            {/* 前の月 */}
             <div style={{ width: '33.333%', flexShrink: 0 }}>
               <MonthGrid
                 year={prev.year}
@@ -285,7 +351,6 @@ export function HeaderCalendar({ open, currentDate, onSelectDate, onClose }: Pro
                 onDateTap={handleDateTap}
               />
             </div>
-            {/* 現在の月 */}
             <div style={{ width: '33.333%', flexShrink: 0 }}>
               <MonthGrid
                 year={viewYear}
@@ -295,7 +360,6 @@ export function HeaderCalendar({ open, currentDate, onSelectDate, onClose }: Pro
                 onDateTap={handleDateTap}
               />
             </div>
-            {/* 次の月 */}
             <div style={{ width: '33.333%', flexShrink: 0 }}>
               <MonthGrid
                 year={next.year}
@@ -309,7 +373,7 @@ export function HeaderCalendar({ open, currentDate, onSelectDate, onClose }: Pro
         </div>
       </div>
 
-      {/* 月ボタンバー（境界線なし） */}
+      {/* 月ボタンバー */}
       <div
         ref={monthBarRef}
         className="flex items-center gap-2 px-2 py-2 overflow-x-auto"
@@ -320,31 +384,17 @@ export function HeaderCalendar({ open, currentDate, onSelectDate, onClose }: Pro
           const showYearLabel = i === 0 || (i > 0 && monthList[i - 1].year !== item.year)
 
           return (
-            <div key={`${item.year}-${item.month}`} className="flex items-center gap-2 flex-shrink-0">
+            <div key={item.key} className="flex items-center gap-2 flex-shrink-0" data-month-key={item.key}>
               {showYearLabel && (
                 <span className="font-semibold text-slate-500" style={{ fontSize: 15 }}>
                   {item.year}
                 </span>
               )}
-              <button
-                data-active={isCurrentView}
-                className={`rounded-full font-medium transition-colors flex-shrink-0 ${
-                  isCurrentView
-                    ? 'font-bold'
-                    : 'text-slate-600 border border-slate-300'
-                }`}
-                style={{
-                  fontSize: 15,
-                  paddingLeft: 16,
-                  paddingRight: 16,
-                  paddingTop: 6,
-                  paddingBottom: 6,
-                  ...(isCurrentView ? { backgroundColor: '#fce4ec', color: '#b71c1c' } : {}),
-                }}
+              <MonthButton
+                label={item.label}
+                isSelected={isCurrentView}
                 onClick={() => handleMonthSelect(item.year, item.month)}
-              >
-                {item.label}
-              </button>
+              />
             </div>
           )
         })}
