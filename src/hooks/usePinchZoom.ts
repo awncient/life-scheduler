@@ -10,14 +10,22 @@ export function usePinchZoom(
 ) {
   const containerRef = useRef<HTMLDivElement>(null)
   const initialDistance = useRef(0)
-  const initialZoom = useRef(zoomLevel)
+  const initialZoom = useRef(0)
   const isPinching = useRef(false)
   const pinchCenterY = useRef(0)
   const initialScrollTop = useRef(0)
+  const lastScale = useRef(1)
+  const zoomRef = useRef(zoomLevel)
+
+  // Keep zoomRef in sync
+  zoomRef.current = zoomLevel
 
   useEffect(() => {
     const el = containerRef.current
     if (!el) return
+
+    // Find the scrollable content child (first child of the scroll container)
+    const getContentEl = () => el.firstElementChild as HTMLElement | null
 
     const onTouchStart = (e: TouchEvent) => {
       if (e.touches.length === 2) {
@@ -26,13 +34,22 @@ export function usePinchZoom(
         const dx = e.touches[0].clientX - e.touches[1].clientX
         const dy = e.touches[0].clientY - e.touches[1].clientY
         initialDistance.current = Math.hypot(dx, dy)
-        initialZoom.current = zoomLevel
+        initialZoom.current = zoomRef.current
+        lastScale.current = 1
 
         // ピンチ中心のY座標（コンテナ内相対位置）
         const centerClientY = (e.touches[0].clientY + e.touches[1].clientY) / 2
         const rect = el.getBoundingClientRect()
         pinchCenterY.current = centerClientY - rect.top
         initialScrollTop.current = el.scrollTop
+
+        // CSSトランスフォーム用にtransformOriginを設定
+        const contentEl = getContentEl()
+        if (contentEl) {
+          const originY = el.scrollTop + pinchCenterY.current
+          contentEl.style.transformOrigin = `center ${originY}px`
+          contentEl.style.willChange = 'transform'
+        }
       }
     }
 
@@ -43,21 +60,24 @@ export function usePinchZoom(
         const dy = e.touches[0].clientY - e.touches[1].clientY
         const dist = Math.hypot(dx, dy)
         if (initialDistance.current > 0) {
-          const scale = dist / initialDistance.current
-          const next = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, initialZoom.current * scale))
+          const rawScale = dist / initialDistance.current
+          const targetZoom = initialZoom.current * rawScale
+          const clampedZoom = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, targetZoom))
+          const visualScale = clampedZoom / initialZoom.current
 
-          // ピンチ中心のコンテンツ上の位置を維持する
-          const contentY = initialScrollTop.current + pinchCenterY.current
-          const ratio = next / initialZoom.current
-          const newContentY = contentY * ratio
-          const newScrollTop = newContentY - pinchCenterY.current
+          lastScale.current = visualScale
 
-          setZoomLevel(next)
+          // CSSトランスフォームで即座にビジュアルフィードバック（リレンダーなし）
+          const contentEl = getContentEl()
+          if (contentEl) {
+            contentEl.style.transform = `scaleY(${visualScale})`
 
-          // 次フレームでスクロール位置を補正
-          requestAnimationFrame(() => {
+            // スクロール位置をピンチ中心に合わせて補正
+            const contentY = initialScrollTop.current + pinchCenterY.current
+            const newContentY = contentY * visualScale
+            const newScrollTop = newContentY - pinchCenterY.current
             el.scrollTop = Math.max(0, newScrollTop)
-          })
+          }
         }
       }
     }
@@ -66,8 +86,30 @@ export function usePinchZoom(
       if (isPinching.current) {
         isPinching.current = false
         initialDistance.current = 0
-        // Snap to nearest 0.5 on release for clean grid
-        setZoomLevel(Math.round(zoomLevel * 2) / 2)
+
+        // CSSトランスフォームをリセット
+        const contentEl = getContentEl()
+        if (contentEl) {
+          contentEl.style.transform = ''
+          contentEl.style.transformOrigin = ''
+          contentEl.style.willChange = ''
+        }
+
+        // 最終的なズームレベルをReactステートに反映（0.5単位にスナップ）
+        const finalZoom = initialZoom.current * lastScale.current
+        const snapped = Math.round(Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, finalZoom)) * 2) / 2
+
+        // スクロール位置を補正
+        const ratio = snapped / zoomRef.current
+        const contentY = el.scrollTop + pinchCenterY.current
+        const newContentY = contentY * ratio
+        const newScrollTop = newContentY - pinchCenterY.current
+
+        setZoomLevel(snapped)
+
+        requestAnimationFrame(() => {
+          el.scrollTop = Math.max(0, newScrollTop)
+        })
       }
     }
 
@@ -82,7 +124,7 @@ export function usePinchZoom(
       el.removeEventListener('touchend', onTouchEnd)
       el.removeEventListener('touchcancel', onTouchEnd)
     }
-  }, [zoomLevel, setZoomLevel])
+  }, [setZoomLevel]) // zoomLevelを依存から除外 — refで参照
 
   const persistZoom = useCallback(
     (level: number) => {

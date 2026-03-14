@@ -40,7 +40,13 @@ function getDayDots(dateStr: string): { hasIdeal: boolean; hasActual: boolean } 
   }
 }
 
-/** 月ボタンバーで表示する月リスト生成（前後12ヶ月） */
+/** 前後の月を計算 */
+function adjacentMonth(year: number, month: number, delta: number): { year: number; month: number } {
+  const d = new Date(year, month + delta, 1)
+  return { year: d.getFullYear(), month: d.getMonth() }
+}
+
+/** 月ボタンバーで表示する月リスト生成（前後24ヶ月） */
 function generateMonthList(centerYear: number, centerMonth: number) {
   const items: { year: number; month: number; label: string }[] = []
   for (let offset = -24; offset <= 24; offset++) {
@@ -52,6 +58,72 @@ function generateMonthList(centerYear: number, centerMonth: number) {
   return items
 }
 
+/** 月カレンダーグリッド（単一月分） */
+function MonthGrid({
+  year,
+  month,
+  todayStr,
+  currentDate,
+  onDateTap,
+}: {
+  year: number
+  month: number
+  todayStr: string
+  currentDate: string
+  onDateTap: (dateStr: string) => void
+}) {
+  const weeks = useMemo(() => getMonthWeeks(year, month), [year, month])
+
+  return (
+    <div>
+      {weeks.map((week, wi) => (
+        <div key={wi} className="grid grid-cols-7">
+          {week.map((dateStr, di) => {
+            if (!dateStr) return <div key={di} className="py-1" />
+
+            const isToday = dateStr === todayStr
+            const isSelected = dateStr === currentDate
+            const day = parseDate(dateStr).getDate()
+            const dots = getDayDots(dateStr)
+
+            return (
+              <button
+                key={di}
+                className="flex flex-col items-center py-1 relative"
+                onClick={() => onDateTap(dateStr)}
+              >
+                <div
+                  className={`w-8 h-8 flex items-center justify-center rounded-full text-sm transition-colors ${
+                    isToday
+                      ? 'text-white font-bold'
+                      : isSelected
+                        ? 'bg-slate-200 font-semibold text-slate-900'
+                        : 'text-slate-700'
+                  }`}
+                  style={isToday ? { backgroundColor: ACTUAL_COLOR } : undefined}
+                >
+                  {day}
+                </div>
+                {!isToday && (
+                  <div className="flex gap-0.5 mt-0.5 h-1.5">
+                    {dots.hasIdeal && (
+                      <div className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: IDEAL_COLOR }} />
+                    )}
+                    {dots.hasActual && (
+                      <div className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: ACTUAL_COLOR }} />
+                    )}
+                  </div>
+                )}
+                {isToday && <div className="h-1.5 mt-0.5" />}
+              </button>
+            )
+          })}
+        </div>
+      ))}
+    </div>
+  )
+}
+
 export function HeaderCalendar({ open, currentDate, onSelectDate, onClose }: Props) {
   const selected = parseDate(currentDate)
   const [viewYear, setViewYear] = useState(selected.getFullYear())
@@ -59,24 +131,38 @@ export function HeaderCalendar({ open, currentDate, onSelectDate, onClose }: Pro
 
   const todayStr = getTodayInTimezone(getSettings().timezoneOffset)
 
+  // スワイプ状態
+  const containerRef = useRef<HTMLDivElement>(null)
+  const swipeStartX = useRef(0)
+  const swipeCurrentX = useRef(0)
+  const isSwiping = useRef(false)
+  const [translateX, setTranslateX] = useState(0)
+  const [isAnimating, setIsAnimating] = useState(false)
+
   // open時に現在日付の月にリセット
   useEffect(() => {
     if (open) {
       const d = parseDate(currentDate)
       setViewYear(d.getFullYear())
       setViewMonth(d.getMonth())
+      setTranslateX(0)
     }
   }, [open, currentDate])
-
-  const weeks = useMemo(() => getMonthWeeks(viewYear, viewMonth), [viewYear, viewMonth])
 
   // 月ボタンリスト
   const monthList = useMemo(() => generateMonthList(viewYear, viewMonth), [viewYear, viewMonth])
   const monthBarRef = useRef<HTMLDivElement>(null)
 
-  // 月バーの現在月を中央にスクロール
+  // open時のみ月バーの現在月を中央にスクロール
+  const hasScrolledOnOpen = useRef(false)
   useEffect(() => {
-    if (!open || !monthBarRef.current) return
+    if (open) {
+      hasScrolledOnOpen.current = false
+    }
+  }, [open])
+  useEffect(() => {
+    if (!open || !monthBarRef.current || hasScrolledOnOpen.current) return
+    hasScrolledOnOpen.current = true
     const el = monthBarRef.current
     const activeBtn = el.querySelector('[data-active="true"]') as HTMLElement | null
     if (activeBtn) {
@@ -85,52 +171,75 @@ export function HeaderCalendar({ open, currentDate, onSelectDate, onClose }: Pro
     }
   }, [open, viewYear, viewMonth])
 
-  // カレンダーのスワイプで月移動
-  const calendarRef = useRef<HTMLDivElement>(null)
-  const swipeStartX = useRef(0)
-  const swiping = useRef(false)
+  // 前後の月
+  const prev = adjacentMonth(viewYear, viewMonth, -1)
+  const next = adjacentMonth(viewYear, viewMonth, 1)
 
+  // スワイプハンドラー
   const handleTouchStart = useCallback((e: React.TouchEvent) => {
+    if (isAnimating) return
     swipeStartX.current = e.touches[0].clientX
-    swiping.current = true
-  }, [])
+    swipeCurrentX.current = e.touches[0].clientX
+    isSwiping.current = true
+  }, [isAnimating])
 
-  const handleTouchEnd = useCallback((e: React.TouchEvent) => {
-    if (!swiping.current) return
-    swiping.current = false
-    const dx = e.changedTouches[0].clientX - swipeStartX.current
+  const handleTouchMove = useCallback((e: React.TouchEvent) => {
+    if (!isSwiping.current || isAnimating) return
+    swipeCurrentX.current = e.touches[0].clientX
+    const dx = swipeCurrentX.current - swipeStartX.current
+    setTranslateX(dx)
+  }, [isAnimating])
+
+  const handleTouchEnd = useCallback(() => {
+    if (!isSwiping.current || isAnimating) return
+    isSwiping.current = false
+    const dx = swipeCurrentX.current - swipeStartX.current
+    const containerWidth = containerRef.current?.clientWidth ?? 300
+
     if (Math.abs(dx) > 50) {
-      if (dx < 0) {
-        // 左スワイプ → 次の月
-        setViewMonth(prev => {
-          if (prev === 11) { setViewYear(y => y + 1); return 0 }
-          return prev + 1
-        })
-      } else {
-        // 右スワイプ → 前の月
-        setViewMonth(prev => {
-          if (prev === 0) { setViewYear(y => y - 1); return 11 }
-          return prev - 1
-        })
-      }
-    }
-  }, [])
+      // スワイプ確定 — アニメーションで画面外にスライド
+      const targetX = dx < 0 ? -containerWidth : containerWidth
+      setTranslateX(targetX)
+      setIsAnimating(true)
 
-  const handleMonthSelect = useCallback((year: number, month: number) => {
-    setViewYear(year)
-    setViewMonth(month)
-  }, [])
+      setTimeout(() => {
+        if (dx < 0) {
+          // 左スワイプ → 次の月
+          setViewMonth(m => {
+            if (m === 11) { setViewYear(y => y + 1); return 0 }
+            return m + 1
+          })
+        } else {
+          // 右スワイプ → 前の月
+          setViewMonth(m => {
+            if (m === 0) { setViewYear(y => y - 1); return 11 }
+            return m - 1
+          })
+        }
+        setTranslateX(0)
+        setIsAnimating(false)
+      }, 250)
+    } else {
+      // スワイプキャンセル — 元に戻す
+      setTranslateX(0)
+    }
+  }, [isAnimating])
 
   const handleDateTap = useCallback((dateStr: string) => {
     onSelectDate(dateStr)
     onClose()
   }, [onSelectDate, onClose])
 
+  const handleMonthSelect = useCallback((year: number, month: number) => {
+    setViewYear(year)
+    setViewMonth(month)
+  }, [])
+
   return (
     <div
       className="overflow-hidden transition-all duration-300 ease-in-out bg-white border-b border-slate-200"
       style={{
-        maxHeight: open ? 400 : 0,
+        maxHeight: open ? 420 : 0,
         opacity: open ? 1 : 0,
       }}
     >
@@ -149,86 +258,81 @@ export function HeaderCalendar({ open, currentDate, onSelectDate, onClose }: Pro
           ))}
         </div>
 
-        {/* カレンダーグリッド */}
+        {/* カレンダーグリッド（3パネルスライド） */}
         <div
-          ref={calendarRef}
+          ref={containerRef}
+          className="overflow-hidden relative"
           onTouchStart={handleTouchStart}
+          onTouchMove={handleTouchMove}
           onTouchEnd={handleTouchEnd}
         >
-          {weeks.map((week, wi) => (
-            <div key={wi} className="grid grid-cols-7">
-              {week.map((dateStr, di) => {
-                if (!dateStr) return <div key={di} className="py-1" />
-
-                const isToday = dateStr === todayStr
-                const isSelected = dateStr === currentDate
-                const day = parseDate(dateStr).getDate()
-                const dots = getDayDots(dateStr)
-
-                return (
-                  <button
-                    key={di}
-                    className="flex flex-col items-center py-1 relative"
-                    onClick={() => handleDateTap(dateStr)}
-                  >
-                    <div
-                      className={`w-8 h-8 flex items-center justify-center rounded-full text-sm transition-colors ${
-                        isToday
-                          ? 'text-white font-bold'
-                          : isSelected
-                            ? 'bg-slate-200 font-semibold text-slate-900'
-                            : 'text-slate-700'
-                      }`}
-                      style={isToday ? { backgroundColor: ACTUAL_COLOR } : undefined}
-                    >
-                      {day}
-                    </div>
-                    {/* データドット（今日でも選択日でもない場合のみ） */}
-                    {!isToday && (
-                      <div className="flex gap-0.5 mt-0.5 h-1.5">
-                        {dots.hasIdeal && (
-                          <div className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: IDEAL_COLOR }} />
-                        )}
-                        {dots.hasActual && (
-                          <div className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: ACTUAL_COLOR }} />
-                        )}
-                      </div>
-                    )}
-                    {isToday && <div className="h-1.5 mt-0.5" />}
-                  </button>
-                )
-              })}
+          <div
+            className="flex"
+            style={{
+              transform: `translateX(calc(-100% + ${translateX}px))`,
+              transition: isAnimating ? 'transform 250ms ease-out' : 'none',
+              width: '300%',
+            }}
+          >
+            {/* 前の月 */}
+            <div className="w-1/3 flex-shrink-0">
+              <MonthGrid
+                year={prev.year}
+                month={prev.month}
+                todayStr={todayStr}
+                currentDate={currentDate}
+                onDateTap={handleDateTap}
+              />
             </div>
-          ))}
+            {/* 現在の月 */}
+            <div className="w-1/3 flex-shrink-0">
+              <MonthGrid
+                year={viewYear}
+                month={viewMonth}
+                todayStr={todayStr}
+                currentDate={currentDate}
+                onDateTap={handleDateTap}
+              />
+            </div>
+            {/* 次の月 */}
+            <div className="w-1/3 flex-shrink-0">
+              <MonthGrid
+                year={next.year}
+                month={next.month}
+                todayStr={todayStr}
+                currentDate={currentDate}
+                onDateTap={handleDateTap}
+              />
+            </div>
+          </div>
         </div>
       </div>
 
       {/* 月ボタンバー */}
       <div
         ref={monthBarRef}
-        className="flex items-center gap-1 px-2 py-2 overflow-x-auto border-t border-slate-100"
+        className="flex items-center gap-1.5 px-2 py-2 overflow-x-auto border-t border-slate-100"
         style={{ scrollbarWidth: 'none', WebkitOverflowScrolling: 'touch' }}
       >
         {monthList.map((item, i) => {
           const isCurrentView = item.year === viewYear && item.month === viewMonth
-          // 年の変わり目の前に年ラベルを挿入
           const showYearLabel = i === 0 || (i > 0 && monthList[i - 1].year !== item.year)
 
           return (
-            <div key={`${item.year}-${item.month}`} className="flex items-center gap-1 flex-shrink-0">
+            <div key={`${item.year}-${item.month}`} className="flex items-center gap-1.5 flex-shrink-0">
               {showYearLabel && (
-                <span className="text-xs font-semibold text-slate-500 px-1">
+                <span className="text-sm font-semibold text-slate-500 px-1">
                   {item.year}
                 </span>
               )}
               <button
                 data-active={isCurrentView}
-                className={`px-3 py-1 rounded-full text-xs font-medium transition-colors flex-shrink-0 ${
+                className={`px-4 py-1.5 rounded-full text-sm font-medium transition-colors flex-shrink-0 ${
                   isCurrentView
-                    ? 'text-white'
+                    ? 'font-bold'
                     : 'text-slate-600 border border-slate-300 hover:bg-slate-100'
                 }`}
-                style={isCurrentView ? { backgroundColor: ACTUAL_COLOR } : undefined}
+                style={isCurrentView ? { backgroundColor: '#fce4ec', color: '#b71c1c' } : undefined}
                 onClick={() => handleMonthSelect(item.year, item.month)}
               >
                 {item.label}
