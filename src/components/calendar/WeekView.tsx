@@ -25,7 +25,7 @@ function getWeekDates(baseDateStr: string): string[] {
 export function WeekView({ baseDate, onSelectDate }: Props) {
   const weekDates = useMemo(() => getWeekDates(baseDate), [baseDate])
   const todayStr = getTodayInTimezone(getSettings().timezoneOffset)
-  const slotHeight = getSettings().zoomLevel / 2
+  const slotHeight = getSettings().zoomLevel
 
   return (
     <div className="flex flex-col h-full">

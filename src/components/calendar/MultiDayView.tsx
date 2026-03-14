@@ -208,8 +208,7 @@ export function MultiDayView({ baseDate, days, onSelectDate, onNavigateDate }: P
 
   const [zoomLevel, setZoomLevel] = useState(loadZoomLevel)
   const { containerRef, persistZoom } = usePinchZoom(zoomLevel, setZoomLevel)
-  const scale = days === 7 ? 0.5 : 1 / 1.5
-  const slotHeight = zoomLevel * scale
+  const slotHeight = zoomLevel
   const bottomPadding = slotHeight * SLOTS_PER_HOUR
   const totalHeight = SLOT_COUNT * slotHeight + bottomPadding
 

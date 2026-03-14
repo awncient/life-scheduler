@@ -42,7 +42,7 @@ export function VersionHistoryView({ date, onBack }: Props) {
     ;(scrollContainerRef as React.MutableRefObject<HTMLDivElement | null>).current = el
   }
 
-  const slotHeight = zoomLevel * 0.5
+  const slotHeight = zoomLevel
 
   useEffect(() => {
     persistZoom(zoomLevel)
@@ -196,7 +196,7 @@ export function VersionHistoryView({ date, onBack }: Props) {
                       return (
                         <div
                           key={block.id}
-                          className="absolute left-0.5 right-0.5 rounded px-1 text-white text-[8px] overflow-hidden"
+                          className="absolute left-0.5 right-0.5 rounded px-1 text-white text-xs overflow-hidden"
                           style={{
                             top: `${top}px`,
                             height: `${height}px`,
@@ -204,7 +204,7 @@ export function VersionHistoryView({ date, onBack }: Props) {
                             minHeight: '4px',
                           }}
                         >
-                          <div className="truncate leading-tight">{block.title || '（タイトルなし）'}</div>
+                          <div className="leading-tight break-words">{block.title || '（タイトルなし）'}</div>
                         </div>
                       )
                     })}

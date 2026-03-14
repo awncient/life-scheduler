@@ -1,8 +1,8 @@
 import { useState } from 'react'
-import { parseDate, getTodayInTimezone } from '@/types'
-import { getSettings } from '@/lib/storage'
+import { parseDate } from '@/types'
 import { Button } from '@/components/ui/button'
 import { SearchModal } from '@/components/calendar/SearchModal'
+import { HeaderCalendar } from '@/components/calendar/HeaderCalendar'
 import {
   ListChecks,
   Calendar,
@@ -10,6 +10,8 @@ import {
   Settings,
   ChevronLeft,
   ChevronRight,
+  ChevronDown,
+  ChevronUp,
 } from 'lucide-react'
 
 type AppMode = 'calendar' | 'todo' | 'settings'
@@ -39,18 +41,12 @@ export function Header({
   onScrollToSlot,
 }: Props) {
   const [searchOpen, setSearchOpen] = useState(false)
-
-  const goToToday = () => {
-    setCurrentDate(getTodayInTimezone(getSettings().timezoneOffset))
-  }
+  const [calendarOpen, setCalendarOpen] = useState(false)
 
   const dateLabel = (() => {
     const d = parseDate(currentDate)
     if (calendarView === 'day') {
       return `${d.getFullYear()}/${d.getMonth() + 1}/${d.getDate()}（${DAY_NAMES_JP[d.getDay()]}）`
-    }
-    if (calendarView === 'three') {
-      return `${d.getFullYear()}/${d.getMonth() + 1}/${d.getDate()}`
     }
     return `${d.getFullYear()}/${d.getMonth() + 1}月`
   })()
@@ -89,10 +85,14 @@ export function Header({
               <ChevronLeft className="h-5 w-5" />
             </button>
             <button
-              className="text-sm font-medium min-w-[100px] text-center px-1"
-              onClick={goToToday}
+              className="flex items-center gap-0.5 text-sm font-medium min-w-[100px] justify-center px-1"
+              onClick={() => setCalendarOpen(prev => !prev)}
             >
               {dateLabel}
+              {calendarOpen
+                ? <ChevronUp className="h-3.5 w-3.5 opacity-60" />
+                : <ChevronDown className="h-3.5 w-3.5 opacity-60" />
+              }
             </button>
             <button
               className="p-1 rounded hover:bg-slate-700 active:bg-slate-600 transition-colors"
@@ -132,6 +132,18 @@ export function Header({
         </div>
       </header>
 
+      {/* Calendar dropdown */}
+      {mode === 'calendar' && (
+        <HeaderCalendar
+          open={calendarOpen}
+          currentDate={currentDate}
+          onSelectDate={(date) => {
+            setCurrentDate(date)
+          }}
+          onClose={() => setCalendarOpen(false)}
+        />
+      )}
+
       {/* Search modal */}
       <SearchModal
         open={searchOpen}
@@ -141,7 +153,6 @@ export function Header({
           setCalendarView('day')
           setSearchOpen(false)
           if (scrollToSlot != null) {
-            // Delay to let DayView mount with new date
             setTimeout(() => onScrollToSlot?.(scrollToSlot), 100)
           }
         }}
