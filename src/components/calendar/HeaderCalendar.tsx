@@ -273,19 +273,25 @@ export function HeaderCalendar({ open, currentDate, onSelectDate, onClose }: Pro
       setIsAnimating(true)
 
       setTimeout(() => {
+        // 1. まずtransitionを除去（これだけ先に描画させる）
         setIsAnimating(false)
-        setTranslateX(0)
-        if (dx < 0) {
-          setViewMonth(m => {
-            if (m === 11) { setViewYear(y => y + 1); return 0 }
-            return m + 1
-          })
-        } else {
-          setViewMonth(m => {
-            if (m === 0) { setViewYear(y => y - 1); return 11 }
-            return m - 1
-          })
-        }
+
+        // 2. 次フレームでtranslateXリセットと月切り替えを同時に行う
+        //    transitionが確実に除去された後なのでチラつかない
+        requestAnimationFrame(() => {
+          setTranslateX(0)
+          if (dx < 0) {
+            setViewMonth(m => {
+              if (m === 11) { setViewYear(y => y + 1); return 0 }
+              return m + 1
+            })
+          } else {
+            setViewMonth(m => {
+              if (m === 0) { setViewYear(y => y - 1); return 11 }
+              return m - 1
+            })
+          }
+        })
       }, 250)
     } else {
       setTranslateX(0)
