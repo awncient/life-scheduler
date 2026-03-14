@@ -1,8 +1,9 @@
 import { useState, useEffect, useRef } from 'react'
 import type { IdealSnapshot, TimeBlock } from '@/types'
-import { SLOT_COUNT, SLOTS_PER_HOUR, DEFAULT_SETTINGS, slotToTime } from '@/types'
+import { SLOT_COUNT, SLOTS_PER_HOUR, DEFAULT_SETTINGS, slotToTime, getTodayInTimezone, getNowInTimezone } from '@/types'
 import { getSnapshots, saveSnapshots, getSchedule, getSettings } from '@/lib/storage'
 import { usePinchZoom } from '@/hooks/usePinchZoom'
+import { CurrentTimeIndicator } from './CurrentTimeIndicator'
 import { Button } from '@/components/ui/button'
 import { ArrowLeft, Trash2 } from 'lucide-react'
 
@@ -43,6 +44,9 @@ export function VersionHistoryView({ date, onBack }: Props) {
   }
 
   const slotHeight = zoomLevel
+  const settings = getSettings()
+  const todayStr = getTodayInTimezone(settings.timezoneOffset)
+  const isToday = date === todayStr
 
   useEffect(() => {
     persistZoom(zoomLevel)
@@ -52,12 +56,20 @@ export function VersionHistoryView({ date, onBack }: Props) {
     setSnapshots(getSnapshots(date))
   }, [date])
 
-  // Scroll to right (latest) on mount
+  // Scroll to right (latest) on mount + 今日なら現在時刻が画面上から1/3の位置に
   useEffect(() => {
-    if (scrollContainerRef.current) {
-      scrollContainerRef.current.scrollLeft = scrollContainerRef.current.scrollWidth
+    const el = scrollContainerRef.current
+    if (!el) return
+    el.scrollLeft = el.scrollWidth
+
+    if (isToday) {
+      const now = getNowInTimezone(settings.timezoneOffset)
+      const currentSlot = now.hours * SLOTS_PER_HOUR + now.minutes / 5
+      const currentPos = currentSlot * slotHeight
+      const viewHeight = el.clientHeight
+      el.scrollTop = Math.max(0, currentPos - viewHeight / 3)
     }
-  }, [snapshots])
+  }, [snapshots, isToday, slotHeight])
 
   const currentBlocks = getSchedule(date).idealBlocks
 
@@ -173,7 +185,7 @@ export function VersionHistoryView({ date, onBack }: Props) {
             </div>
 
             {/* Grid */}
-            <div className="flex" style={{ height: `${totalHeight}px` }}>
+            <div className="flex relative" style={{ height: `${totalHeight}px` }}>
               {columns.map((col, idx) => {
                 const isLast = idx === columns.length - 1
                 return (
@@ -211,6 +223,7 @@ export function VersionHistoryView({ date, onBack }: Props) {
                   </div>
                 )
               })}
+              {isToday && <CurrentTimeIndicator slotHeight={slotHeight} />}
             </div>
           </div>
         </div>
