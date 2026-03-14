@@ -144,7 +144,7 @@ export function SettingsView({ onBack }: Props) {
         <section>
           <h2 className="text-sm font-semibold text-gray-700 mb-3">開発を応援する</h2>
           <p className="text-xs text-gray-500 mb-3">
-            このアプリが役に立っていたら、ぜひ応援をお願いします！
+            感謝の銀河特急、メルシー⭐︎サブウェイ
           </p>
           <a
             href="https://crenoumenatory.booth.pm/items/8077092"
