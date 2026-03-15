@@ -1,4 +1,4 @@
-import { useRef, useState, useEffect, useCallback } from 'react'
+import { useRef, useState, useEffect, useCallback, useLayoutEffect } from 'react'
 import type { TimeBlock as TimeBlockType } from '@/types'
 import { slotToTime, SLOT_COUNT } from '@/types'
 
@@ -159,9 +159,30 @@ export function TimeBlockItem({ block, slotHeight, onTap, onDragEnd, onCopyToAct
 
   const showCopyHint = isDragActive && dragX > 40
 
+  // 時間ラベルがはみ出すかどうかを測定
+  const [showTimeLabel, setShowTimeLabel] = useState(true)
+  const timeLabelRef = useRef<HTMLDivElement>(null)
+  const blockContainerRef = useRef<HTMLDivElement>(null)
+
+  useLayoutEffect(() => {
+    const container = blockContainerRef.current
+    const label = timeLabelRef.current
+    if (!container || !label) {
+      setShowTimeLabel(false)
+      return
+    }
+    // ラベルの下端がコンテナの下端を超えるかチェック
+    const containerBottom = container.clientHeight
+    const labelBottom = label.offsetTop + label.offsetHeight
+    setShowTimeLabel(labelBottom <= containerBottom)
+  }, [height, slotHeight, block.title])
+
   return (
     <div
-      ref={elementRef}
+      ref={(el) => {
+        (elementRef as React.MutableRefObject<HTMLDivElement | null>).current = el
+        ;(blockContainerRef as React.MutableRefObject<HTMLDivElement | null>).current = el
+      }}
       className={`absolute rounded px-1 py-0.5 text-xs overflow-hidden select-none ${
         isDragActive ? 'opacity-80 z-20 cursor-grabbing shadow-lg ring-2 ring-white/50' : 'cursor-pointer'
       } ${showCopyHint ? 'ring-blue-400' : ''}`}
@@ -181,9 +202,13 @@ export function TimeBlockItem({ block, slotHeight, onTap, onDragEnd, onCopyToAct
       onClick={handleClick}
     >
       <div className="font-medium leading-tight break-words">{block.title || '（タイトルなし）'}</div>
-      {height > slotHeight * 6 && (
-        <div className="opacity-60 text-[10px] leading-tight">{timeLabel}</div>
-      )}
+      <div
+        ref={timeLabelRef}
+        className="opacity-60 text-[10px] leading-tight"
+        style={{ visibility: showTimeLabel ? 'visible' : 'hidden', position: showTimeLabel ? 'relative' : 'absolute' }}
+      >
+        {timeLabel}
+      </div>
       {showCopyHint && (
         <div className="absolute inset-0 flex items-center justify-center bg-black/20 rounded text-[10px] font-bold text-white">
           実際にコピー

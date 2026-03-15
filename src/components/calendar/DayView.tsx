@@ -36,19 +36,21 @@ function ReadOnlyBlocks({ blocks, slotHeight }: { blocks: TimeBlock[]; slotHeigh
     <>
       {blocks.map((block, i) => {
         const top = block.startTime * slotHeight
-        const height = (block.endTime - block.startTime) * slotHeight
+        const height = Math.max(16, (block.endTime - block.startTime) * slotHeight - 1)
         return (
           <div
             key={`${block.id}-${i}`}
-            className="absolute left-0.5 right-0.5 rounded-sm px-1 text-white text-[10px] overflow-hidden"
+            className="absolute left-0.5 right-0.5 rounded px-1 py-0.5 text-white text-xs overflow-hidden"
             style={{
               top: `${top}px`,
               height: `${height}px`,
               backgroundColor: block.color,
-              minHeight: '4px',
+              paddingLeft: '4px',
+              paddingRight: '2px',
+              minHeight: '16px',
             }}
           >
-            <div className="truncate leading-tight">{block.title || '（タイトルなし）'}</div>
+            <div className="font-medium leading-tight break-words">{block.title || '（タイトルなし）'}</div>
           </div>
         )
       })}

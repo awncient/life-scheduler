@@ -185,8 +185,18 @@ export function BlockEditor({
     setActivePicker(activePicker === picker ? null : picker)
   }
 
+  const handleOpenChange = (v: boolean) => {
+    if (!v) {
+      // タイトルに入力がある場合は確認ダイアログを表示
+      if (title.trim().length > 0) {
+        if (!window.confirm('入力内容が破棄されます。よろしいですか？')) return
+      }
+      onClose()
+    }
+  }
+
   return (
-    <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
+    <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent>
         <DialogDescription className="sr-only">
           {side === 'ideal' ? '理想（予定）' : '実際（記録）'}のブロック{isEdit ? '編集' : '追加'}
