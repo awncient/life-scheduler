@@ -1,6 +1,6 @@
-import { useState, useCallback } from 'react'
-import { formatDate, parseDate, getTodayInTimezone } from '@/types'
-import { getSettings } from '@/lib/storage'
+import { useState, useCallback, useEffect } from 'react'
+import { formatDate, parseDate, getTodayInTimezone, slotToTime } from '@/types'
+import { getSettings, getSchedule } from '@/lib/storage'
 import { Header } from '@/components/layout/Header'
 import { DayView } from '@/components/calendar/DayView'
 import { MultiDayView } from '@/components/calendar/MultiDayView'
@@ -18,6 +18,28 @@ export default function App() {
   const [scrollToSlot, setScrollToSlot] = useState<number | null>(null)
 
   const [prevMode, setPrevMode] = useState<'calendar' | 'todo'>('calendar')
+
+  // Service Workerからのブロック情報リクエストに応答
+  useEffect(() => {
+    const handler = (event: MessageEvent) => {
+      if (event.data?.type === 'GET_BLOCK_INFO' && event.ports[0]) {
+        const { blockId, dateStr } = event.data
+        const schedule = getSchedule(dateStr)
+        const block = [...schedule.idealBlocks, ...schedule.actualBlocks].find(b => b.id === blockId)
+        if (block) {
+          event.ports[0].postMessage({
+            title: block.title,
+            startTime: slotToTime(block.startTime),
+            endTime: slotToTime(block.endTime),
+          })
+        } else {
+          event.ports[0].postMessage(null)
+        }
+      }
+    }
+    navigator.serviceWorker?.addEventListener('message', handler)
+    return () => navigator.serviceWorker?.removeEventListener('message', handler)
+  }, [])
 
   const showHeader = mode !== 'settings' && !(mode === 'calendar' && calendarView === 'history')
 

@@ -1,0 +1,19 @@
+name = "daylog-notify"
+main = "src/index.ts"
+compatibility_date = "2025-01-01"
+
+# Cron Trigger: 毎分実行して送信すべき通知をチェック
+[triggers]
+crons = ["* * * * *"]
+
+# D1データベース
+[[d1_databases]]
+binding = "DB"
+database_name = "daylog-db"
+database_id = "ここにD1作成後のIDを貼り付け"
+
+# 環境変数（secretsはwrangler secretで設定）
+# VAPID_PUBLIC_KEY  = wrangler secret put で設定
+# VAPID_PRIVATE_KEY = wrangler secret put で設定
+# VAPID_SUBJECT     = wrangler secret put で設定
+# PRO_KEY_HASH      = wrangler secret put で設定
