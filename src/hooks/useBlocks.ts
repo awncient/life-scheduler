@@ -73,14 +73,16 @@ export function useBlocks(date: string) {
 
   // Ideal blocks
   const addIdealBlock = useCallback(
-    (block: Omit<TimeBlock, 'id'>) => {
+    (block: Omit<TimeBlock, 'id'>): TimeBlock => {
       const prev = schedule.idealBlocks
       const tz = getSettings().timezoneOffset
+      const newBlock: TimeBlock = { ...block, id: generateId(), timezoneOffset: tz }
       const updated = {
         ...schedule,
-        idealBlocks: [...prev, { ...block, id: generateId(), timezoneOffset: tz }],
+        idealBlocks: [...prev, newBlock],
       }
       saveWithOptionalSnapshot(updated, prev)
+      return newBlock
     },
     [schedule, saveWithOptionalSnapshot],
   )
@@ -129,14 +131,16 @@ export function useBlocks(date: string) {
 
   // Actual blocks
   const addActualBlock = useCallback(
-    (block: Omit<TimeBlock, 'id'>) => {
+    (block: Omit<TimeBlock, 'id'>): TimeBlock => {
       const tz = getSettings().timezoneOffset
+      const newBlock: TimeBlock = { ...block, id: generateId(), timezoneOffset: tz }
       const updated = {
         ...schedule,
-        actualBlocks: [...schedule.actualBlocks, { ...block, id: generateId(), timezoneOffset: tz }],
+        actualBlocks: [...schedule.actualBlocks, newBlock],
       }
       saveSchedule(updated)
       setSchedule(updated)
+      return newBlock
     },
     [schedule],
   )

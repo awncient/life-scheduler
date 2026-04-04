@@ -1,0 +1,22 @@
+name = "daylog-notify"
+main = "src/index.ts"
+compatibility_date = "2025-01-01"
+
+# Cron Trigger: 毎分実行して送信すべき通知をチェック
+[triggers]
+crons = ["* * * * *"]
+
+# D1データベース
+[[d1_databases]]
+binding = "DB"
+database_name = "daylog-db"
+database_id = "f616f6dc-73ef-4aa5-8503-78fca7d47bc9"
+
+# 公開しても問題ない環境変数
+[vars]
+VAPID_PUBLIC_KEY = "BP0ywSH5i2gf32k3nS_VeUoNmLvrRKyPmcqt0PaVJjHTx0JNfpbmYWGRpq0W3rYKgBsmCOJnR2weGwnc2DmUchM"
+
+# 以下はGitHubのSecrets経由で wrangler secret put で設定（リポジトリには書かない）
+# - VAPID_PRIVATE_KEY
+# - VAPID_SUBJECT (メールアドレスを含むため)
+# - PRO_KEY_HASH
