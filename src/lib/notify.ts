@@ -245,9 +245,9 @@ export async function syncNotificationSchedule(
   endSlot: number,
   config: NotifyConfig,
   timezoneOffset: number
-): Promise<void> {
+): Promise<{ success: boolean; error?: string }> {
   const subscriptionId = getSubscriptionId()
-  if (!subscriptionId) return
+  if (!subscriptionId) return { success: false, error: '購読IDが見つかりません。通知を再度有効にしてください。' }
 
   const notifications: Array<{ type: 'start' | 'end'; notifyAt: string }> = []
 
@@ -266,7 +266,7 @@ export async function syncNotificationSchedule(
   }
 
   try {
-    await workerFetch('/schedule', {
+    const res = await workerFetch('/schedule', {
       method: 'POST',
       body: JSON.stringify({
         subscriptionId,
@@ -275,8 +275,13 @@ export async function syncNotificationSchedule(
         notifications,
       }),
     })
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({})) as { error?: string }
+      return { success: false, error: data.error || `サーバーエラー (${res.status})` }
+    }
+    return { success: true }
   } catch (e) {
-    console.error('通知スケジュール同期エラー:', e)
+    return { success: false, error: `通知スケジュール同期エラー: ${e instanceof Error ? e.message : '不明'}` }
   }
 }
 

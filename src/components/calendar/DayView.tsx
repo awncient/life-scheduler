@@ -211,6 +211,9 @@ export function DayView({ date, onOpenHistory, onNavigateDate, scrollToSlot }: P
           const cfg = getBlockNotifyConfig(block.id, blockDate)
           if (cfg) {
             syncNotificationSchedule(block.id, blockDate, newStartSlot, newEndSlot, cfg, timezoneOffset)
+              .then(result => {
+                if (!result.success) alert(`通知設定エラー: ${result.error}`)
+              })
           }
         }
       } else {
@@ -255,7 +258,9 @@ export function DayView({ date, onOpenHistory, onNavigateDate, scrollToSlot }: P
       saveBlockNotifyConfig(newBlock.id, date, notifyConfig)
       syncNotificationSchedule(
         newBlock.id, date, data.startTime, data.endTime, notifyConfig, timezoneOffset
-      )
+      ).then(result => {
+        if (!result.success) alert(`通知設定エラー: ${result.error}`)
+      })
     }
   }
 
@@ -299,6 +304,9 @@ export function DayView({ date, onOpenHistory, onNavigateDate, scrollToSlot }: P
         const startSlot = data.startTime ?? editingBlock?.startTime ?? 0
         const endSlot = data.endTime ?? editingBlock?.endTime ?? 0
         syncNotificationSchedule(id, blockDate, startSlot, endSlot, notifyConfig, timezoneOffset)
+          .then(result => {
+            if (!result.success) alert(`通知設定エラー: ${result.error}`)
+          })
       } else {
         // 通知設定なし → サーバーからも削除
         deleteNotificationSchedule(id, blockDate)
