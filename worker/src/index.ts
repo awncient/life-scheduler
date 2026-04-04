@@ -24,7 +24,7 @@ function cors(response: Response): Response {
   headers.set('Access-Control-Allow-Origin', '*')
   headers.set('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS')
   headers.set('Access-Control-Allow-Headers', 'Content-Type, X-Pro-Key')
-  return new Response(response.body, { ...response, headers })
+  return new Response(response.body, { status: response.status, statusText: response.statusText, headers })
 }
 
 function json(data: unknown, status = 200): Response {
