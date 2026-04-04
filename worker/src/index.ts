@@ -497,33 +497,46 @@ async function handleCron(env: Env): Promise<void> {
 
 // ===== メインハンドラー =====
 
+/** 絶対にクラッシュしない安全なレスポンス生成 */
+function safeErrorResponse(e: unknown): Response {
+  try {
+    const msg = e instanceof Error ? `${e.name}: ${e.message}\n${e.stack}` : String(e)
+    return new Response(JSON.stringify({ error: 'Worker exception', detail: msg }), {
+      status: 500,
+      headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' },
+    })
+  } catch {
+    return new Response('Internal Server Error', { status: 500 })
+  }
+}
+
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
-    // CORS preflight
-    if (request.method === 'OPTIONS') {
-      return cors(new Response(null, { status: 204 }))
-    }
-
-    const url = new URL(request.url)
-    const path = url.pathname
-
     try {
+      // CORS preflight
+      if (request.method === 'OPTIONS') {
+        return cors(new Response(null, { status: 204 }))
+      }
+
+      const url = new URL(request.url)
+      const path = url.pathname
+
       if (path === '/validate' && request.method === 'POST') {
-        return handleValidate(request, env)
+        return await handleValidate(request, env)
       }
       if (path === '/subscribe' && request.method === 'POST') {
-        return handleSubscribe(request, env)
+        return await handleSubscribe(request, env)
       }
       if (path === '/schedule' && request.method === 'POST') {
-        return handleSchedule(request, env)
+        return await handleSchedule(request, env)
       }
       if (path === '/schedule/delete' && request.method === 'POST') {
-        return handleDeleteSchedule(request, env)
+        return await handleDeleteSchedule(request, env)
       }
 
       // Health check（バージョン確認用）
       if (path === '/health') {
-        return json({ status: 'ok', version: '2024-04-04-v2' })
+        return json({ status: 'ok', version: '2024-04-04-v3' })
       }
 
       // デバッグ用: DB状態確認（PROキー必須）
@@ -580,14 +593,7 @@ export default {
       return error('Not Found', 404)
     } catch (e) {
       console.error('Worker error:', e)
-      // error()→json()→cors() の再帰クラッシュを避けるため、直接Responseを返す
-      return new Response(JSON.stringify({ error: 'Internal Server Error', detail: e instanceof Error ? e.message : String(e) }), {
-        status: 500,
-        headers: {
-          'Content-Type': 'application/json',
-          'Access-Control-Allow-Origin': '*',
-        },
-      })
+      return safeErrorResponse(e)
     }
   },
 
