@@ -580,7 +580,14 @@ export default {
       return error('Not Found', 404)
     } catch (e) {
       console.error('Worker error:', e)
-      return error('Internal Server Error', 500)
+      // error()→json()→cors() の再帰クラッシュを避けるため、直接Responseを返す
+      return new Response(JSON.stringify({ error: 'Internal Server Error', detail: e instanceof Error ? e.message : String(e) }), {
+        status: 500,
+        headers: {
+          'Content-Type': 'application/json',
+          'Access-Control-Allow-Origin': '*',
+        },
+      })
     }
   },
 
