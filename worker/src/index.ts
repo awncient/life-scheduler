@@ -521,9 +521,9 @@ export default {
         return handleDeleteSchedule(request, env)
       }
 
-      // Health check
+      // Health check（バージョン確認用）
       if (path === '/health') {
-        return json({ status: 'ok' })
+        return json({ status: 'ok', version: '2024-04-04-v2' })
       }
 
       // デバッグ用: DB状態確認（PROキー必須）
