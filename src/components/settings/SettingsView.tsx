@@ -3,7 +3,7 @@ import { Button } from '@/components/ui/button'
 import { downloadJSON, readJSONFile, importData } from '@/lib/export-import'
 import { getSettings, saveSettings } from '@/lib/storage'
 import {
-  getWorkerUrl, setWorkerUrl as saveWorkerUrl,
+  getWorkerUrl,
   isPremiumValidated, validateProKey, registerPushSubscription,
   isNotificationReady, resetPremium,
 } from '@/lib/notify'
@@ -59,7 +59,6 @@ export function SettingsView({ onBack }: Props) {
   const [settings, setSettings] = useState(() => getSettings())
 
   // PRO通知関連
-  const [workerUrl, setWorkerUrlState] = useState(() => getWorkerUrl())
   const [proKeyInput, setProKeyInput] = useState('')
   const [validated, setValidated] = useState(() => isPremiumValidated())
   const [notifyReady, setNotifyReady] = useState(() => isNotificationReady())
@@ -239,20 +238,6 @@ export function SettingsView({ onBack }: Props) {
               <p className="text-xs text-gray-500">
                 BOOTHで購入したPROキーを入力すると、ブロックの開始/終了時刻にプッシュ通知を受け取れます。
               </p>
-              {/* Worker URL（通常は変更不要。隠しフィールド） */}
-              <div>
-                <label className="text-xs text-gray-400">通知サーバーURL</label>
-                <input
-                  type="url"
-                  value={workerUrl}
-                  onChange={(e) => {
-                    setWorkerUrlState(e.target.value)
-                    saveWorkerUrl(e.target.value)
-                  }}
-                  placeholder="https://daylog-notify.xxxxx.workers.dev"
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-slate-400 mt-1"
-                />
-              </div>
               <div>
                 <label className="text-xs text-gray-400">PROキー</label>
                 <div className="flex gap-2 mt-1">
@@ -265,7 +250,7 @@ export function SettingsView({ onBack }: Props) {
                   />
                   <Button
                     variant="outline"
-                    disabled={proLoading || !proKeyInput.trim() || !workerUrl.trim()}
+                    disabled={proLoading || !proKeyInput.trim() || !getWorkerUrl()}
                     onClick={async () => {
                       setProLoading(true)
                       setProStatus('')

@@ -9,8 +9,9 @@
 
 const STORAGE_PREFIX = 'daylog:notify'
 
-// Worker APIのベースURL（デプロイ後に設定画面で入力、またはビルド時に埋め込み）
-const WORKER_URL_KEY = `${STORAGE_PREFIX}:workerUrl`
+// Worker APIのベースURL（ビルド時に埋め込み）
+const WORKER_BASE_URL = (import.meta.env.VITE_WORKER_URL || '').replace(/\/$/, '')
+
 const PRO_KEY_KEY = `${STORAGE_PREFIX}:proKey`
 const VALIDATED_KEY = `${STORAGE_PREFIX}:validated`
 const SUBSCRIPTION_ID_KEY = `${STORAGE_PREFIX}:subscriptionId`
@@ -19,11 +20,7 @@ const VAPID_PUBLIC_KEY_KEY = `${STORAGE_PREFIX}:vapidPublicKey`
 // ===== 認証状態の管理 =====
 
 export function getWorkerUrl(): string {
-  return localStorage.getItem(WORKER_URL_KEY) || ''
-}
-
-export function setWorkerUrl(url: string): void {
-  localStorage.setItem(WORKER_URL_KEY, url.replace(/\/$/, ''))
+  return WORKER_BASE_URL
 }
 
 export function getProKey(): string {
