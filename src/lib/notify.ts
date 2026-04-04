@@ -278,8 +278,16 @@ export async function syncNotificationSchedule(
       notifications,
     })
     if (!res.ok) {
-      const data = await res.json().catch(() => ({})) as { error?: string }
-      return { success: false, error: data.error || `サーバーエラー (${res.status})` }
+      const text = await res.text().catch(() => '')
+      let msg = `サーバーエラー (${res.status})`
+      try {
+        const data = JSON.parse(text) as { error?: string; detail?: string }
+        msg = data.detail || data.error || msg
+      } catch {
+        // HTMLエラーページ等の場合は先頭部分を表示
+        if (text) msg += ': ' + text.substring(0, 120)
+      }
+      return { success: false, error: msg }
     }
     return { success: true }
   } catch (e) {
