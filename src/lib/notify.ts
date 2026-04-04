@@ -160,19 +160,25 @@ export async function registerPushSubscription(): Promise<{ success: boolean; er
     }
 
     const subJSON = subscription.toJSON()
+    const body = JSON.stringify({
+      endpoint: subJSON.endpoint,
+      keys: subJSON.keys,
+    })
 
     // Worker に登録
     let res: Response
     try {
-      res = await workerFetch('/subscribe', {
+      const url = `${getWorkerUrl()}/subscribe`
+      res = await fetch(url, {
         method: 'POST',
-        body: JSON.stringify({
-          endpoint: subJSON.endpoint,
-          keys: subJSON.keys,
-        }),
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Pro-Key': getProKey(),
+        },
+        body,
       })
     } catch (e) {
-      return { success: false, error: `Workerへの送信で失敗: ${e instanceof Error ? e.message : '不明'}` }
+      return { success: false, error: `Workerへの送信で失敗: ${e instanceof Error ? e.message : '不明'} / URL: ${getWorkerUrl()}/subscribe` }
     }
 
     const data = await res.json() as { subscriptionId?: string; error?: string }
