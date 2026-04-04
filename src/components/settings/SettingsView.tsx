@@ -283,8 +283,8 @@ export function SettingsView({ onBack }: Props) {
         {/* プライバシー・ソースコード */}
         <section>
           <p className="text-xs text-gray-500 leading-relaxed">
-            タスクの内容（タイトル等）はあなたのデバイスにのみ保存されます。<br />
-            通知機能を利用する場合も、通知サーバーにはタスク内容は送信されず、<br />
+            タスクの内容（タイトル等）・TODOに記載した情報はあなたのデバイスにのみ保存されます。<br />
+            通知機能を利用する場合も、通知サーバーにはこれらの内容は送信されず、<br />
             通知タイミングの情報のみが送信されます。
           </p>
           <p className="text-xs text-gray-500 mt-2">
