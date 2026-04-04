@@ -83,11 +83,21 @@ function base64UrlDecode(str: string): Uint8Array {
   return bytes
 }
 
-async function importVapidPrivateKey(base64Key: string): Promise<CryptoKey> {
-  const rawKey = base64UrlDecode(base64Key)
+async function importVapidPrivateKey(base64UrlPrivateKey: string, base64UrlPublicKey: string): Promise<CryptoKey> {
+  // VAPID公開鍵は65バイト（uncompressed point: 0x04 + x(32) + y(32)）
+  const pubBytes = base64UrlDecode(base64UrlPublicKey)
+  const x = base64UrlEncode(pubBytes.slice(1, 33))
+  const y = base64UrlEncode(pubBytes.slice(33, 65))
+
   return crypto.subtle.importKey(
-    'pkcs8',
-    rawKey,
+    'jwk',
+    {
+      kty: 'EC',
+      crv: 'P-256',
+      d: base64UrlPrivateKey,
+      x,
+      y,
+    },
     { name: 'ECDSA', namedCurve: 'P-256' },
     false,
     ['sign']
@@ -98,6 +108,7 @@ async function createVapidJwt(
   audience: string,
   subject: string,
   privateKeyBase64: string,
+  publicKeyBase64: string,
   expiration: number
 ): Promise<string> {
   const header = base64UrlEncode(new TextEncoder().encode(JSON.stringify({ typ: 'JWT', alg: 'ES256' })))
@@ -109,7 +120,7 @@ async function createVapidJwt(
 
   const signingInput = `${header}.${payload}`
 
-  const privateKey = await importVapidPrivateKey(privateKeyBase64)
+  const privateKey = await importVapidPrivateKey(privateKeyBase64, publicKeyBase64)
   const signature = await crypto.subtle.sign(
     { name: 'ECDSA', hash: 'SHA-256' },
     privateKey,
@@ -120,6 +131,126 @@ async function createVapidJwt(
   const sig = base64UrlEncode(new Uint8Array(signature))
 
   return `${signingInput}.${sig}`
+}
+
+async function encryptPayload(
+  payload: string,
+  p256dhBase64: string,
+  authBase64: string
+): Promise<{ encrypted: ArrayBuffer; salt: Uint8Array }> {
+  const clientPublicKeyBytes = base64UrlDecode(p256dhBase64)
+  const authSecret = base64UrlDecode(authBase64)
+  const payloadBytes = new TextEncoder().encode(payload)
+
+  // サーバー側のECDH鍵ペアを生成
+  const serverKeyPair = await crypto.subtle.generateKey(
+    { name: 'ECDH', namedCurve: 'P-256' },
+    true,
+    ['deriveBits']
+  ) as CryptoKeyPair
+
+  // サーバー公開鍵をraw形式でエクスポート
+  const serverPublicKeyBytes = new Uint8Array(
+    await crypto.subtle.exportKey('raw', serverKeyPair.publicKey) as ArrayBuffer
+  )
+
+  // クライアント公開鍵をインポート
+  const clientPublicKey = await crypto.subtle.importKey(
+    'raw',
+    clientPublicKeyBytes,
+    { name: 'ECDH', namedCurve: 'P-256' },
+    false,
+    []
+  )
+
+  // ECDH共有秘密
+  const sharedSecret = new Uint8Array(
+    await crypto.subtle.deriveBits(
+      { name: 'ECDH', public: clientPublicKey } as unknown as SubtleCryptoDeriveKeyAlgorithm,
+      serverKeyPair.privateKey,
+      256
+    ) as ArrayBuffer
+  )
+
+  // ソルト生成
+  const salt = crypto.getRandomValues(new Uint8Array(16))
+
+  // auth_info = "WebPush: info\0" + clientPublicKey + serverPublicKey
+  const authInfo = new Uint8Array([
+    ...new TextEncoder().encode('WebPush: info\0'),
+    ...clientPublicKeyBytes,
+    ...serverPublicKeyBytes,
+  ])
+
+  // PRK = HMAC-SHA-256(auth_secret, shared_secret)
+  const hmacKey = await crypto.subtle.importKey(
+    'raw', authSecret, { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']
+  )
+  const prk = new Uint8Array(await crypto.subtle.sign('HMAC', hmacKey, sharedSecret))
+
+  // HKDF-Expand で IKM を導出
+  const ikm = await hkdfExpand(prk, authInfo, 32)
+
+  // CEK と Nonce を導出
+  const cekInfo = new Uint8Array([
+    ...new TextEncoder().encode('Content-Encoding: aes128gcm\0'),
+  ])
+  const nonceInfo = new Uint8Array([
+    ...new TextEncoder().encode('Content-Encoding: nonce\0'),
+  ])
+
+  // PRK2 = HMAC-SHA-256(salt, ikm)
+  const saltKey = await crypto.subtle.importKey(
+    'raw', salt, { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']
+  )
+  const prk2 = new Uint8Array(await crypto.subtle.sign('HMAC', saltKey, ikm))
+
+  const cek = await hkdfExpand(prk2, cekInfo, 16)
+  const nonce = await hkdfExpand(prk2, nonceInfo, 12)
+
+  // パディング (1バイトのデリミタ \x02 + ゼロパディング)
+  const paddedPayload = new Uint8Array(payloadBytes.length + 1)
+  paddedPayload.set(payloadBytes)
+  paddedPayload[payloadBytes.length] = 2 // デリミタ
+
+  // AES-128-GCM で暗号化
+  const aesKey = await crypto.subtle.importKey('raw', cek, { name: 'AES-GCM' }, false, ['encrypt'])
+  const ciphertext = await crypto.subtle.encrypt(
+    { name: 'AES-GCM', iv: nonce },
+    aesKey,
+    paddedPayload
+  )
+
+  // aes128gcm ヘッダー: salt(16) + rs(4) + idlen(1) + keyid(65)
+  const rs = 4096
+  const header = new Uint8Array(16 + 4 + 1 + serverPublicKeyBytes.length)
+  header.set(salt, 0)
+  header[16] = (rs >> 24) & 0xff
+  header[17] = (rs >> 16) & 0xff
+  header[18] = (rs >> 8) & 0xff
+  header[19] = rs & 0xff
+  header[20] = serverPublicKeyBytes.length
+  header.set(serverPublicKeyBytes, 21)
+
+  // ヘッダー + 暗号文を結合
+  const result = new Uint8Array(header.length + ciphertext.byteLength)
+  result.set(header, 0)
+  result.set(new Uint8Array(ciphertext), header.length)
+
+  return { encrypted: result.buffer, salt }
+}
+
+/** HKDF-Expand (RFC 5869) */
+async function hkdfExpand(prk: Uint8Array, info: Uint8Array, length: number): Promise<Uint8Array> {
+  const hmacKey = await crypto.subtle.importKey(
+    'raw', prk, { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']
+  )
+  // T(1) = HMAC-Hash(PRK, info || 0x01)
+  const input = new Uint8Array(info.length + 1)
+  input.set(info, 0)
+  input[info.length] = 1
+  const output = new Uint8Array(await crypto.subtle.sign('HMAC', hmacKey, input))
+  return output.slice(0, length)
 }
 
 async function sendPushNotification(
@@ -136,7 +267,15 @@ async function sendPushNotification(
       audience,
       env.VAPID_SUBJECT,
       env.VAPID_PRIVATE_KEY,
+      env.VAPID_PUBLIC_KEY,
       expiration
+    )
+
+    // RFC 8291 に準拠してペイロードを暗号化
+    const { encrypted } = await encryptPayload(
+      payload,
+      subscription.p256dh,
+      subscription.auth
     )
 
     const response = await fetch(subscription.endpoint, {
@@ -145,13 +284,13 @@ async function sendPushNotification(
         'Authorization': `vapid t=${jwt}, k=${env.VAPID_PUBLIC_KEY}`,
         'Content-Type': 'application/octet-stream',
         'Content-Encoding': 'aes128gcm',
+        'Content-Length': encrypted.byteLength.toString(),
         'TTL': '86400',
       },
-      body: new TextEncoder().encode(payload),
+      body: encrypted,
     })
 
     if (response.status === 410 || response.status === 404) {
-      // 購読が無効になっている → DBから削除
       return false
     }
 
