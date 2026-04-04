@@ -141,7 +141,7 @@ export async function registerPushSubscription(): Promise<{ success: boolean; er
     // Push購読を作成
     const subscription = await registration.pushManager.subscribe({
       userVisibleOnly: true,
-      applicationServerKey: urlBase64ToUint8Array(vapidKey).buffer as ArrayBuffer,
+      applicationServerKey: urlBase64ToUint8Array(vapidKey),
     })
 
     const subJSON = subscription.toJSON()
@@ -164,7 +164,7 @@ export async function registerPushSubscription(): Promise<{ success: boolean; er
 
     return { success: false, error: data.error || '登録に失敗しました' }
   } catch (e) {
-    return { success: false, error: `エラー: ${e instanceof Error ? e.message : '不明'}` }
+    return { success: false, error: `エラー: ${e instanceof Error ? `${e.name}: ${e.message}` : '不明'}` }
   }
 }
 
