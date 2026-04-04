@@ -381,6 +381,14 @@ async function handleSchedule(request: Request, env: Env): Promise<Response> {
     return error('必須パラメータが不足しています')
   }
 
+  // 購読が存在するか確認
+  const sub = await env.DB.prepare(
+    'SELECT id FROM push_subscriptions WHERE id = ?'
+  ).bind(body.subscriptionId as string).first()
+  if (!sub) {
+    return error('購読が見つかりません。通知を再度有効にしてください。', 404)
+  }
+
   // 既存の同ブロックのスケジュールを削除
   await env.DB.prepare(`
     DELETE FROM notification_schedules

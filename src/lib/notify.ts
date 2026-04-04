@@ -271,12 +271,29 @@ export async function syncNotificationSchedule(
   }
 
   try {
-    const res = await workerFetch('/schedule', {
+    let res = await workerFetch('/schedule', {
       subscriptionId,
       blockId,
       dateStr,
       notifications,
     })
+
+    // 購読が見つからない場合は再登録を試みてリトライ
+    if (res.status === 404) {
+      const reReg = await registerPushSubscription()
+      if (reReg.success) {
+        const newSubId = getSubscriptionId()
+        if (newSubId) {
+          res = await workerFetch('/schedule', {
+            subscriptionId: newSubId,
+            blockId,
+            dateStr,
+            notifications,
+          })
+        }
+      }
+    }
+
     if (!res.ok) {
       const text = await res.text().catch(() => '')
       let msg = `サーバーエラー (${res.status})`
@@ -284,7 +301,6 @@ export async function syncNotificationSchedule(
         const data = JSON.parse(text) as { error?: string; detail?: string }
         msg = data.detail || data.error || msg
       } catch {
-        // HTMLエラーページ等の場合は先頭部分を表示
         if (text) msg += ': ' + text.substring(0, 120)
       }
       return { success: false, error: msg }
