@@ -249,6 +249,9 @@ export async function syncNotificationSchedule(
   const subscriptionId = getSubscriptionId()
   if (!subscriptionId) return { success: false, error: '購読IDが見つかりません。通知を再度有効にしてください。' }
 
+  const base = getWorkerUrl()
+  if (!base) return { success: false, error: `Worker URLが空です` }
+
   const notifications: Array<{ type: 'start' | 'end'; notifyAt: string }> = []
 
   if (config.startEnabled) {
@@ -265,9 +268,23 @@ export async function syncNotificationSchedule(
     })
   }
 
+  // まずWorkerへの疎通確認
   try {
-    const res = await workerFetch('/schedule', {
+    await fetch(`${base}/health`, { mode: 'cors' })
+  } catch (e) {
+    return { success: false, error: `Worker疎通失敗 (${base}/health): ${e instanceof Error ? e.message : '不明'}` }
+  }
+
+  try {
+    const headers = new Headers()
+    const proKey = getProKey()
+    if (proKey) headers.set('X-Pro-Key', btoa(encodeURIComponent(proKey)))
+    headers.set('Content-Type', 'application/json')
+
+    const res = await fetch(`${base}/schedule`, {
       method: 'POST',
+      headers,
+      mode: 'cors',
       body: JSON.stringify({
         subscriptionId,
         blockId,
@@ -281,7 +298,7 @@ export async function syncNotificationSchedule(
     }
     return { success: true }
   } catch (e) {
-    return { success: false, error: `通知スケジュール同期エラー: ${e instanceof Error ? e.message : '不明'}` }
+    return { success: false, error: `スケジュール送信失敗 (${base}/schedule): ${e instanceof Error ? e.message : '不明'}` }
   }
 }
 
