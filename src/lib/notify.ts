@@ -77,7 +77,7 @@ async function workerFetch(
   if (proKey) headers.set('X-Pro-Key', btoa(encodeURIComponent(proKey)))
   headers.set('Content-Type', 'application/json')
 
-  return fetch(`${base}${path}`, { ...options, headers })
+  return fetch(`${base}${path}`, { ...options, headers, mode: 'cors' })
 }
 
 // ===== PROキー検証 =====
