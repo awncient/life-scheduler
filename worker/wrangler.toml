@@ -12,8 +12,12 @@ binding = "DB"
 database_name = "daylog-db"
 database_id = "ここにD1作成後のIDを貼り付け"
 
-# 環境変数（secretsはwrangler secretで設定）
-# VAPID_PUBLIC_KEY  = wrangler secret put で設定
-# VAPID_PRIVATE_KEY = wrangler secret put で設定
-# VAPID_SUBJECT     = wrangler secret put で設定
-# PRO_KEY_HASH      = wrangler secret put で設定
+# 公開しても問題ない環境変数はここに設定
+# VAPID_PUBLIC_KEY と VAPID_SUBJECT はここに記載OK（秘密情報ではないため）
+[vars]
+# VAPID_PUBLIC_KEY = "ステップで生成した公開鍵をここに貼り付け"
+# VAPID_SUBJECT = "mailto:あなたのメールアドレス"
+
+# 以下はGitHubのSecrets経由で wrangler secret put で設定される（このファイルには書かない）
+# - VAPID_PRIVATE_KEY
+# - PRO_KEY_HASH
