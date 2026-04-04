@@ -60,6 +60,29 @@ function decodeProKey(raw: string): string {
   }
 }
 
+/**
+ * リクエストbodyからPROキーを検証する共通ヘルパー。
+ * iOS Safari PWA でCORS preflightを回避するため、
+ * PROキーはヘッダーではなくbodyの _proKey フィールドに含めて送信される。
+ */
+async function parseBodyAndAuth(request: Request, env: Env): Promise<{ body: Record<string, unknown>; error?: Response }> {
+  const text = await request.text()
+  let body: Record<string, unknown>
+  try {
+    body = JSON.parse(text)
+  } catch {
+    return { body: {}, error: error('不正なリクエスト形式です') }
+  }
+
+  const rawKey = body._proKey as string | undefined
+  if (!rawKey) return { body, error: error('PROキーが必要です', 401) }
+
+  const hash = await hashKey(decodeProKey(rawKey))
+  if (hash !== env.PRO_KEY_HASH) return { body, error: error('無効なキーです', 401) }
+
+  return { body }
+}
+
 // ===== Web Push（VAPID署名 + 暗号化） =====
 
 /**
@@ -305,10 +328,14 @@ async function sendPushNotification(
 
 /** POST /validate - PROキー検証 */
 async function handleValidate(request: Request, env: Env): Promise<Response> {
-  const body = await request.json() as { key?: string }
-  if (!body.key) return error('キーが必要です')
+  const { body, error: authError } = await parseBodyAndAuth(request, env)
+  // validateは _proKey がなくても body.key で認証を試みる（後方互換）
+  if (!body.key && authError) return authError
 
-  const hash = await hashKey(body.key)
+  const key = (body.key || '') as string
+  if (!key) return error('キーが必要です')
+
+  const hash = await hashKey(key)
   if (hash !== env.PRO_KEY_HASH) {
     return error('無効なキーです', 401)
   }
@@ -318,17 +345,11 @@ async function handleValidate(request: Request, env: Env): Promise<Response> {
 
 /** POST /subscribe - Push購読登録 */
 async function handleSubscribe(request: Request, env: Env): Promise<Response> {
-  const rawKey = request.headers.get('X-Pro-Key')
-  if (!rawKey) return error('PROキーが必要です', 401)
-  const hash = await hashKey(decodeProKey(rawKey))
-  if (hash !== env.PRO_KEY_HASH) return error('無効なキーです', 401)
+  const { body, error: authError } = await parseBodyAndAuth(request, env)
+  if (authError) return authError
 
-  const body = await request.json() as {
-    endpoint?: string
-    keys?: { p256dh?: string; auth?: string }
-  }
-
-  if (!body.endpoint || !body.keys?.p256dh || !body.keys?.auth) {
+  const keys = body.keys as { p256dh?: string; auth?: string } | undefined
+  if (!body.endpoint || !keys?.p256dh || !keys?.auth) {
     return error('不正な購読情報です')
   }
 
@@ -341,7 +362,7 @@ async function handleSubscribe(request: Request, env: Env): Promise<Response> {
     ON CONFLICT(endpoint) DO UPDATE SET
       p256dh = excluded.p256dh,
       auth = excluded.auth
-  `).bind(id, body.endpoint, body.keys.p256dh, body.keys.auth).run()
+  `).bind(id, body.endpoint as string, keys!.p256dh, keys!.auth).run()
 
   // 登録されたIDを返す（既存の場合はそのIDを返す）
   const row = await env.DB.prepare(
@@ -353,20 +374,8 @@ async function handleSubscribe(request: Request, env: Env): Promise<Response> {
 
 /** POST /schedule - 通知スケジュール登録/更新 */
 async function handleSchedule(request: Request, env: Env): Promise<Response> {
-  const rawKey = request.headers.get('X-Pro-Key')
-  if (!rawKey) return error('PROキーが必要です', 401)
-  const hash = await hashKey(decodeProKey(rawKey))
-  if (hash !== env.PRO_KEY_HASH) return error('無効なキーです', 401)
-
-  const body = await request.json() as {
-    subscriptionId: string
-    blockId: string
-    dateStr: string
-    notifications: Array<{
-      type: 'start' | 'end'
-      notifyAt: string // ISO8601
-    }>
-  }
+  const { body, error: authError } = await parseBodyAndAuth(request, env)
+  if (authError) return authError
 
   if (!body.subscriptionId || !body.blockId || !body.dateStr) {
     return error('必須パラメータが不足しています')
@@ -376,17 +385,18 @@ async function handleSchedule(request: Request, env: Env): Promise<Response> {
   await env.DB.prepare(`
     DELETE FROM notification_schedules
     WHERE subscription_id = ? AND block_id = ? AND date_str = ?
-  `).bind(body.subscriptionId, body.blockId, body.dateStr).run()
+  `).bind(body.subscriptionId as string, body.blockId as string, body.dateStr as string).run()
 
+  const notifications = body.notifications as Array<{ type: string; notifyAt: string }> | undefined
   // 新しいスケジュールを挿入
-  if (body.notifications && body.notifications.length > 0) {
+  if (notifications && notifications.length > 0) {
     const stmt = env.DB.prepare(`
       INSERT INTO notification_schedules (id, subscription_id, block_id, date_str, type, notify_at)
       VALUES (?, ?, ?, ?, ?, ?)
     `)
 
-    const batch = body.notifications.map(n =>
-      stmt.bind(generateId(), body.subscriptionId, body.blockId, body.dateStr, n.type, n.notifyAt)
+    const batch = notifications.map(n =>
+      stmt.bind(generateId(), body.subscriptionId as string, body.blockId as string, body.dateStr as string, n.type, n.notifyAt)
     )
 
     await env.DB.batch(batch)
@@ -395,17 +405,14 @@ async function handleSchedule(request: Request, env: Env): Promise<Response> {
   return json({ ok: true })
 }
 
-/** DELETE /schedule - 通知スケジュール削除 */
+/** POST /schedule/delete - 通知スケジュール削除 */
 async function handleDeleteSchedule(request: Request, env: Env): Promise<Response> {
-  const rawKey = request.headers.get('X-Pro-Key')
-  if (!rawKey) return error('PROキーが必要です', 401)
-  const hash = await hashKey(decodeProKey(rawKey))
-  if (hash !== env.PRO_KEY_HASH) return error('無効なキーです', 401)
+  const { body, error: authError } = await parseBodyAndAuth(request, env)
+  if (authError) return authError
 
-  const url = new URL(request.url)
-  const subscriptionId = url.searchParams.get('subscriptionId')
-  const blockId = url.searchParams.get('blockId')
-  const dateStr = url.searchParams.get('dateStr')
+  const subscriptionId = body.subscriptionId as string
+  const blockId = body.blockId as string
+  const dateStr = body.dateStr as string
 
   if (!subscriptionId || !blockId || !dateStr) {
     return error('必須パラメータが不足しています')
@@ -510,7 +517,7 @@ export default {
       if (path === '/schedule' && request.method === 'POST') {
         return handleSchedule(request, env)
       }
-      if (path === '/schedule' && request.method === 'DELETE') {
+      if (path === '/schedule/delete' && request.method === 'POST') {
         return handleDeleteSchedule(request, env)
       }
 
