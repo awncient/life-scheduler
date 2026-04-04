@@ -295,7 +295,7 @@ export function SettingsView({ onBack }: Props) {
               className="text-blue-500 underline"
             >https://github.com/awncient/life-scheduler</a>
           </p>
-          <p className="text-xs text-gray-400 mt-2">
+          <p className="text-xs text-gray-400 mt-2 text-right">
             Build: {__BUILD_TIME__}
           </p>
         </section>

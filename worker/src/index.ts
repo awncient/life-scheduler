@@ -519,6 +519,54 @@ export default {
         return json({ status: 'ok' })
       }
 
+      // デバッグ用: DB状態確認（PROキー必須）
+      if (path === '/debug/status' && request.method === 'GET') {
+        const rawKey = request.headers.get('X-Pro-Key')
+        if (!rawKey) return error('PROキーが必要です', 401)
+        const hash = await hashKey(decodeProKey(rawKey))
+        if (hash !== env.PRO_KEY_HASH) return error('無効なキーです', 401)
+
+        const subs = await env.DB.prepare('SELECT id, endpoint, created_at FROM push_subscriptions').all()
+        const schedules = await env.DB.prepare('SELECT id, subscription_id, block_id, date_str, type, notify_at, sent FROM notification_schedules ORDER BY notify_at').all()
+        const now = new Date().toISOString()
+        return json({ now, subscriptions: subs.results, schedules: schedules.results })
+      }
+
+      // デバッグ用: 手動で通知送信テスト（PROキー必須）
+      if (path === '/debug/test-push' && request.method === 'POST') {
+        const rawKey = request.headers.get('X-Pro-Key')
+        if (!rawKey) return error('PROキーが必要です', 401)
+        const hash = await hashKey(decodeProKey(rawKey))
+        if (hash !== env.PRO_KEY_HASH) return error('無効なキーです', 401)
+
+        const subs = await env.DB.prepare('SELECT id, endpoint, p256dh, auth FROM push_subscriptions LIMIT 1').all()
+        if (!subs.results || subs.results.length === 0) {
+          return json({ error: '購読が見つかりません' })
+        }
+
+        const sub = subs.results[0]
+        const testPayload = JSON.stringify({
+          blockId: 'test',
+          dateStr: new Date().toISOString().split('T')[0],
+          type: 'start',
+        })
+
+        try {
+          const success = await sendPushNotification(
+            {
+              endpoint: sub.endpoint as string,
+              p256dh: sub.p256dh as string,
+              auth: sub.auth as string,
+            },
+            testPayload,
+            env
+          )
+          return json({ success, subscription: { id: sub.id, endpoint: sub.endpoint } })
+        } catch (e) {
+          return json({ error: `送信エラー: ${e instanceof Error ? e.message : '不明'}`, stack: e instanceof Error ? e.stack : undefined })
+        }
+      }
+
       return error('Not Found', 404)
     } catch (e) {
       console.error('Worker error:', e)
