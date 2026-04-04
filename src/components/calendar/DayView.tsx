@@ -10,6 +10,14 @@ import { BlockEditor } from './BlockEditor'
 import { CurrentTimeIndicator } from './CurrentTimeIndicator'
 import { Button } from '@/components/ui/button'
 import { History } from 'lucide-react'
+import {
+  type NotifyConfig,
+  saveBlockNotifyConfig,
+  getBlockNotifyConfig,
+  syncNotificationSchedule,
+  deleteNotificationSchedule,
+  isNotificationReady,
+} from '@/lib/notify'
 
 type Props = {
   date: string
@@ -195,11 +203,21 @@ export function DayView({ date, onOpenHistory, onNavigateDate, scrollToSlot }: P
     (side: 'ideal' | 'actual', block: TimeBlock, newStartSlot: number) => {
       if (side === 'ideal') {
         moveIdealBlock(block.id, newStartSlot)
+        // 通知スケジュールも更新
+        if (isNotificationReady()) {
+          const duration = block.endTime - block.startTime
+          const newEndSlot = Math.min(newStartSlot + duration, SLOT_COUNT)
+          const blockDate = block._sourceScheduleDate || date
+          const cfg = getBlockNotifyConfig(block.id, blockDate)
+          if (cfg) {
+            syncNotificationSchedule(block.id, blockDate, newStartSlot, newEndSlot, cfg, timezoneOffset)
+          }
+        }
       } else {
         moveActualBlock(block.id, newStartSlot)
       }
     },
-    [moveIdealBlock, moveActualBlock],
+    [moveIdealBlock, moveActualBlock, date, timezoneOffset],
   )
 
   const copyToActual = useCallback(
@@ -216,7 +234,7 @@ export function DayView({ date, onOpenHistory, onNavigateDate, scrollToSlot }: P
     [addActualBlock],
   )
 
-  const handleSave = (data: Omit<TimeBlock, 'id'> & { endDate?: string }) => {
+  const handleSave = (data: Omit<TimeBlock, 'id'> & { endDate?: string }, notifyConfig?: NotifyConfig) => {
     const color = editorSide === 'ideal' ? IDEAL_COLOR : ACTUAL_COLOR
     const blockData = {
       ...data,
@@ -225,11 +243,23 @@ export function DayView({ date, onOpenHistory, onNavigateDate, scrollToSlot }: P
       endDate: data.endDate,
     }
 
-    if (editorSide === 'ideal') addIdealBlock(blockData)
-    else addActualBlock(blockData)
+    let newBlock: TimeBlock | undefined
+    if (editorSide === 'ideal') {
+      newBlock = addIdealBlock(blockData)
+    } else {
+      newBlock = addActualBlock(blockData)
+    }
+
+    // 通知スケジュールの同期
+    if (notifyConfig && newBlock && isNotificationReady()) {
+      saveBlockNotifyConfig(newBlock.id, date, notifyConfig)
+      syncNotificationSchedule(
+        newBlock.id, date, data.startTime, data.endTime, notifyConfig, timezoneOffset
+      )
+    }
   }
 
-  const handleUpdate = (id: string, data: Partial<TimeBlock> & { endDate?: string }) => {
+  const handleUpdate = (id: string, data: Partial<TimeBlock> & { endDate?: string }, notifyConfig?: NotifyConfig) => {
     const sourceDate = editingBlock?._sourceScheduleDate || date
     const key = editorSide === 'ideal' ? 'idealBlocks' : 'actualBlocks' as const
     const newStartDate = data.startDate || sourceDate
@@ -260,6 +290,20 @@ export function DayView({ date, onOpenHistory, onNavigateDate, scrollToSlot }: P
       if (editorSide === 'ideal') updateIdealBlock(id, data)
       else updateActualBlock(id, data)
     }
+
+    // 通知スケジュールの同期
+    if (isNotificationReady() && editorSide === 'ideal') {
+      const blockDate = newStartDate
+      if (notifyConfig) {
+        saveBlockNotifyConfig(id, blockDate, notifyConfig)
+        const startSlot = data.startTime ?? editingBlock?.startTime ?? 0
+        const endSlot = data.endTime ?? editingBlock?.endTime ?? 0
+        syncNotificationSchedule(id, blockDate, startSlot, endSlot, notifyConfig, timezoneOffset)
+      } else {
+        // 通知設定なし → サーバーからも削除
+        deleteNotificationSchedule(id, blockDate)
+      }
+    }
   }
 
   const handleDelete = (id: string) => {
@@ -274,6 +318,11 @@ export function DayView({ date, onOpenHistory, onNavigateDate, scrollToSlot }: P
     } else {
       if (editorSide === 'ideal') deleteIdealBlock(id)
       else deleteActualBlock(id)
+    }
+
+    // 通知スケジュールも削除
+    if (isNotificationReady() && editorSide === 'ideal') {
+      deleteNotificationSchedule(id, sourceDate)
     }
   }
 

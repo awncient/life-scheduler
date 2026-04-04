@@ -9,7 +9,12 @@ import {
 import { Button } from '@/components/ui/button'
 import { TimeDrumPicker } from './TimeDrumPicker'
 import { MonthCalendar } from './MonthCalendar'
-import { Copy, Trash2 } from 'lucide-react'
+import { Copy, Trash2, Bell } from 'lucide-react'
+import {
+  isNotificationReady,
+  getBlockNotifyConfig,
+  type NotifyConfig,
+} from '@/lib/notify'
 
 type SaveData = Omit<TimeBlock, 'id'> & { endDate?: string }
 
@@ -20,8 +25,8 @@ type Props = {
   defaultStartSlot?: number
   date: string
   side: 'ideal' | 'actual'
-  onSave: (data: SaveData) => void
-  onUpdate?: (id: string, data: Partial<TimeBlock> & { endDate?: string }) => void
+  onSave: (data: SaveData, notifyConfig?: NotifyConfig) => void
+  onUpdate?: (id: string, data: Partial<TimeBlock> & { endDate?: string }, notifyConfig?: NotifyConfig) => void
   onDelete?: (id: string) => void
   onCopyToActual?: (block: TimeBlock) => void
 }
@@ -97,6 +102,13 @@ export function BlockEditor({
   const [endMinutes, setEndMinutes] = useState(0)
   const [activePicker, setActivePicker] = useState<PickerState>(null)
 
+  // 通知設定（PRO機能）
+  const proReady = isNotificationReady()
+  const [startNotify, setStartNotify] = useState(false)
+  const [startMinBefore, setStartMinBefore] = useState(5)
+  const [endNotify, setEndNotify] = useState(false)
+  const [endMinBefore, setEndMinBefore] = useState(5)
+
   useEffect(() => {
     if (open) {
       if (block) {
@@ -113,6 +125,22 @@ export function BlockEditor({
         setStartMinutes(sm)
         setEndHours(eh)
         setEndMinutes(em)
+
+        // 通知設定の読み込み
+        if (proReady) {
+          const cfg = getBlockNotifyConfig(block.id, blockStartDate)
+          if (cfg) {
+            setStartNotify(cfg.startEnabled)
+            setStartMinBefore(cfg.startMinutesBefore)
+            setEndNotify(cfg.endEnabled)
+            setEndMinBefore(cfg.endMinutesBefore)
+          } else {
+            setStartNotify(false)
+            setStartMinBefore(5)
+            setEndNotify(false)
+            setEndMinBefore(5)
+          }
+        }
       } else {
         setTitle('')
         setStartDate(date)
@@ -125,10 +153,14 @@ export function BlockEditor({
         setStartMinutes(sm)
         setEndHours(eh)
         setEndMinutes(em)
+        setStartNotify(false)
+        setStartMinBefore(5)
+        setEndNotify(false)
+        setEndMinBefore(5)
       }
       setActivePicker(null)
     }
-  }, [open, block, defaultStartSlot, date])
+  }, [open, block, defaultStartSlot, date, proReady])
 
   const color = side === 'ideal' ? IDEAL_COLOR : ACTUAL_COLOR
 
@@ -146,6 +178,10 @@ export function BlockEditor({
     const start = timeToSlot(startTimeStr)
     const end = timeToSlot(endTimeStr)
 
+    const notifyConfig: NotifyConfig | undefined = proReady && (startNotify || endNotify)
+      ? { startEnabled: startNotify, startMinutesBefore: startMinBefore, endEnabled: endNotify, endMinutesBefore: endMinBefore }
+      : undefined
+
     if (isEdit && onUpdate && block) {
       onUpdate(block.id, {
         title: finalTitle,
@@ -154,7 +190,7 @@ export function BlockEditor({
         color,
         startDate,
         endDate: isMultiDay ? endDate : undefined,
-      })
+      }, notifyConfig)
     } else {
       onSave({
         title: finalTitle,
@@ -162,7 +198,7 @@ export function BlockEditor({
         endTime: end,
         color,
         ...(isMultiDay ? { endDate } : {}),
-      })
+      }, notifyConfig)
     }
     onClose()
   }
@@ -333,6 +369,60 @@ export function BlockEditor({
               </div>
             )}
           </div>
+
+          {/* 通知設定（PRO） */}
+          {proReady && side === 'ideal' && (
+            <div className="border border-slate-200 rounded-lg p-3 space-y-3">
+              <div className="flex items-center gap-2 text-xs font-medium text-slate-600">
+                <Bell className="h-3.5 w-3.5" />
+                通知設定
+              </div>
+              <div className="flex items-center justify-between">
+                <label className="text-sm text-slate-700">開始前に通知</label>
+                <div className="flex items-center gap-2">
+                  <select
+                    value={startMinBefore}
+                    onChange={(e) => setStartMinBefore(Number(e.target.value))}
+                    disabled={!startNotify}
+                    className="border border-slate-200 rounded px-2 py-1 text-sm bg-white disabled:opacity-40"
+                  >
+                    {[0, 1, 3, 5, 10, 15, 30].map(m => (
+                      <option key={m} value={m}>{m}分前</option>
+                    ))}
+                  </select>
+                  <button
+                    className={`w-10 h-6 rounded-full transition-colors ${startNotify ? 'bg-green-500' : 'bg-slate-300'}`}
+                    onClick={() => setStartNotify(!startNotify)}
+                    type="button"
+                  >
+                    <div className={`w-5 h-5 rounded-full bg-white shadow transition-transform ${startNotify ? 'translate-x-4.5' : 'translate-x-0.5'}`} />
+                  </button>
+                </div>
+              </div>
+              <div className="flex items-center justify-between">
+                <label className="text-sm text-slate-700">終了前に通知</label>
+                <div className="flex items-center gap-2">
+                  <select
+                    value={endMinBefore}
+                    onChange={(e) => setEndMinBefore(Number(e.target.value))}
+                    disabled={!endNotify}
+                    className="border border-slate-200 rounded px-2 py-1 text-sm bg-white disabled:opacity-40"
+                  >
+                    {[0, 1, 3, 5, 10, 15, 30].map(m => (
+                      <option key={m} value={m}>{m}分前</option>
+                    ))}
+                  </select>
+                  <button
+                    className={`w-10 h-6 rounded-full transition-colors ${endNotify ? 'bg-green-500' : 'bg-slate-300'}`}
+                    onClick={() => setEndNotify(!endNotify)}
+                    type="button"
+                  >
+                    <div className={`w-5 h-5 rounded-full bg-white shadow transition-transform ${endNotify ? 'translate-x-4.5' : 'translate-x-0.5'}`} />
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
 
           {!isValidRange && (
             <p className="text-xs text-red-500">終了日時は開始日時より後に設定してください</p>

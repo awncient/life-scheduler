@@ -2,7 +2,12 @@ import { useState, useRef } from 'react'
 import { Button } from '@/components/ui/button'
 import { downloadJSON, readJSONFile, importData } from '@/lib/export-import'
 import { getSettings, saveSettings } from '@/lib/storage'
-import { Download, Upload, ExternalLink, ArrowLeft } from 'lucide-react'
+import {
+  getWorkerUrl,
+  isPremiumValidated, validateProKey, registerPushSubscription,
+  isNotificationReady, resetPremium,
+} from '@/lib/notify'
+import { Download, Upload, ExternalLink, ArrowLeft, Bell, BellOff, Key } from 'lucide-react'
 
 const TIMEZONE_OPTIONS = [
   { label: 'UTC-12:00（ベーカー島）', value: -720 },
@@ -52,6 +57,13 @@ type Props = {
 export function SettingsView({ onBack }: Props) {
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [settings, setSettings] = useState(() => getSettings())
+
+  // PRO通知関連
+  const [proKeyInput, setProKeyInput] = useState('')
+  const [validated, setValidated] = useState(() => isPremiumValidated())
+  const [notifyReady, setNotifyReady] = useState(() => isNotificationReady())
+  const [proStatus, setProStatus] = useState<string>('')
+  const [proLoading, setProLoading] = useState(false)
 
   const handleImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
@@ -160,11 +172,120 @@ export function SettingsView({ onBack }: Props) {
 
         <hr className="border-gray-200" />
 
+        {/* PRO通知機能 */}
+        <section>
+          <h2 className="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2">
+            {notifyReady ? <Bell className="h-4 w-4 text-green-600" /> : <BellOff className="h-4 w-4 text-gray-400" />}
+            通知機能（PRO）
+          </h2>
+
+          {notifyReady ? (
+            <div>
+              <div className="flex items-center gap-2 text-sm text-green-700 bg-green-50 rounded-lg px-3 py-2 mb-3">
+                <Bell className="h-4 w-4" />
+                通知が有効です。ブロック編集画面で通知を設定できます。
+              </div>
+              <button
+                className="text-xs text-red-400 underline"
+                onClick={() => {
+                  if (window.confirm('PRO認証をリセットしますか？通知設定はすべて解除されます。')) {
+                    resetPremium()
+                    setValidated(false)
+                    setNotifyReady(false)
+                    setProStatus('')
+                  }
+                }}
+              >
+                PRO認証をリセット
+              </button>
+            </div>
+          ) : validated ? (
+            <div>
+              <p className="text-xs text-gray-500 mb-3">
+                キー認証済みです。通知の許可を有効にしてください。
+              </p>
+              <Button
+                variant="outline"
+                className="w-full gap-2"
+                disabled={proLoading}
+                onClick={async () => {
+                  setProLoading(true)
+                  setProStatus('')
+                  const result = await registerPushSubscription()
+                  if (result.success) {
+                    setNotifyReady(true)
+                    setProStatus('通知の登録が完了しました！')
+                  } else {
+                    setProStatus(result.error || '登録に失敗しました')
+                  }
+                  setProLoading(false)
+                }}
+              >
+                <Bell className="h-4 w-4" />
+                {proLoading ? '登録中...' : '通知を有効にする'}
+              </Button>
+              <p className="text-xs text-amber-600 mt-2">
+                iOSでは「ホーム画面に追加」した状態でのみ通知が利用できます。
+              </p>
+              {proStatus && (
+                <p className={`text-xs mt-2 ${proStatus.includes('完了') ? 'text-green-600' : 'text-red-500'}`}>
+                  {proStatus}
+                </p>
+              )}
+            </div>
+          ) : (
+            <div className="space-y-3">
+              <p className="text-xs text-gray-500">
+                BOOTHで購入したPROキーを入力すると、ブロックの開始/終了時刻にプッシュ通知を受け取れます。
+              </p>
+              <div>
+                <label className="text-xs text-gray-400">PROキー</label>
+                <div className="flex gap-2 mt-1">
+                  <input
+                    type="text"
+                    value={proKeyInput}
+                    onChange={(e) => setProKeyInput(e.target.value)}
+                    placeholder="DAYLOG-XXXX-XXXX"
+                    className="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-slate-400"
+                  />
+                  <Button
+                    variant="outline"
+                    disabled={proLoading || !proKeyInput.trim() || !getWorkerUrl()}
+                    onClick={async () => {
+                      setProLoading(true)
+                      setProStatus('')
+                      const result = await validateProKey(proKeyInput.trim())
+                      if (result.valid) {
+                        setValidated(true)
+                        setProStatus('キーが認証されました。次に通知を有効にしてください。')
+                      } else {
+                        setProStatus(result.error || '認証に失敗しました')
+                      }
+                      setProLoading(false)
+                    }}
+                  >
+                    <Key className="h-4 w-4" />
+                    {proLoading ? '...' : '認証'}
+                  </Button>
+                </div>
+              </div>
+              {proStatus && (
+                <p className={`text-xs ${proStatus.includes('認証されました') ? 'text-green-600' : 'text-red-500'}`}>
+                  {proStatus}
+                </p>
+              )}
+            </div>
+          )}
+        </section>
+
+        <hr className="border-gray-200" />
+
         {/* プライバシー・ソースコード */}
         <section>
           <p className="text-xs text-gray-500 leading-relaxed">
-            すべてのデータはあなたのデバイスにのみ保存されます。<br />
-            外部サーバーへの送信は一切行われません。
+            タスクの内容（タイトル等）はあなたのデバイスにのみ保存されます。<br />
+            通知機能を利用する場合も、通知サーバーにはタスク内容は送信されず、<br />
+            通知タイミングの情報のみが送信されます。
           </p>
           <p className="text-xs text-gray-500 mt-2">
             説明書・ソースコード：<a
