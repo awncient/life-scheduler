@@ -237,7 +237,7 @@ export function DayView({ date, onOpenHistory, onNavigateDate, scrollToSlot }: P
     [addActualBlock],
   )
 
-  const handleSave = (data: Omit<TimeBlock, 'id'> & { endDate?: string }, notifyConfig?: NotifyConfig) => {
+  const handleSave = async (data: Omit<TimeBlock, 'id'> & { endDate?: string }, notifyConfig?: NotifyConfig) => {
     const color = editorSide === 'ideal' ? IDEAL_COLOR : ACTUAL_COLOR
     const blockData = {
       ...data,
@@ -256,15 +256,14 @@ export function DayView({ date, onOpenHistory, onNavigateDate, scrollToSlot }: P
     // 通知スケジュールの同期
     if (notifyConfig && newBlock && isNotificationReady()) {
       saveBlockNotifyConfig(newBlock.id, date, notifyConfig)
-      syncNotificationSchedule(
+      const result = await syncNotificationSchedule(
         newBlock.id, date, data.startTime, data.endTime, notifyConfig, timezoneOffset
-      ).then(result => {
-        if (!result.success) alert(`通知設定エラー: ${result.error}`)
-      })
+      )
+      if (!result.success) alert(`通知設定エラー: ${result.error}`)
     }
   }
 
-  const handleUpdate = (id: string, data: Partial<TimeBlock> & { endDate?: string }, notifyConfig?: NotifyConfig) => {
+  const handleUpdate = async (id: string, data: Partial<TimeBlock> & { endDate?: string }, notifyConfig?: NotifyConfig) => {
     const sourceDate = editingBlock?._sourceScheduleDate || date
     const key = editorSide === 'ideal' ? 'idealBlocks' : 'actualBlocks' as const
     const newStartDate = data.startDate || sourceDate
@@ -303,10 +302,8 @@ export function DayView({ date, onOpenHistory, onNavigateDate, scrollToSlot }: P
         saveBlockNotifyConfig(id, blockDate, notifyConfig)
         const startSlot = data.startTime ?? editingBlock?.startTime ?? 0
         const endSlot = data.endTime ?? editingBlock?.endTime ?? 0
-        syncNotificationSchedule(id, blockDate, startSlot, endSlot, notifyConfig, timezoneOffset)
-          .then(result => {
-            if (!result.success) alert(`通知設定エラー: ${result.error}`)
-          })
+        const result = await syncNotificationSchedule(id, blockDate, startSlot, endSlot, notifyConfig, timezoneOffset)
+        if (!result.success) alert(`通知設定エラー: ${result.error}`)
       } else {
         // 通知設定なし → サーバーからも削除
         deleteNotificationSchedule(id, blockDate)
