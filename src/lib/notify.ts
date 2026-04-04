@@ -65,29 +65,36 @@ export function resetPremium(): void {
 
 // ===== Worker APIとの通信 =====
 
+/**
+ * Worker APIとの通信。
+ * iOS Safari PWAでCORS preflightが失敗する問題を回避するため、
+ * Content-Type: text/plain を使い、PROキーはbodyに含める（シンプルリクエスト）。
+ */
 async function workerFetch(
   path: string,
-  options: RequestInit = {}
+  body?: Record<string, unknown>
 ): Promise<Response> {
   const base = getWorkerUrl()
   if (!base) throw new Error('Worker URLが設定されていません')
 
-  const headers = new Headers(options.headers)
   const proKey = getProKey()
-  if (proKey) headers.set('X-Pro-Key', btoa(encodeURIComponent(proKey)))
-  headers.set('Content-Type', 'application/json')
+  const payload = JSON.stringify({
+    ...body,
+    _proKey: proKey ? btoa(encodeURIComponent(proKey)) : undefined,
+  })
 
-  return fetch(`${base}${path}`, { ...options, headers, mode: 'cors' })
+  return fetch(`${base}${path}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'text/plain' },
+    body: payload,
+  })
 }
 
 // ===== PROキー検証 =====
 
 export async function validateProKey(key: string): Promise<{ valid: boolean; error?: string }> {
   try {
-    const res = await workerFetch('/validate', {
-      method: 'POST',
-      body: JSON.stringify({ key }),
-    })
+    const res = await workerFetch('/validate', { key })
 
     const data = await res.json() as { valid?: boolean; vapidPublicKey?: string; error?: string }
 
@@ -165,11 +172,8 @@ export async function registerPushSubscription(): Promise<{ success: boolean; er
     let res: Response
     try {
       res = await workerFetch('/subscribe', {
-        method: 'POST',
-        body: JSON.stringify({
-          endpoint: subJSON.endpoint,
-          keys: subJSON.keys,
-        }),
+        endpoint: subJSON.endpoint,
+        keys: subJSON.keys,
       })
     } catch (e) {
       return { success: false, error: `Workerへの送信で失敗: ${e instanceof Error ? e.message : '不明'}` }
@@ -249,9 +253,6 @@ export async function syncNotificationSchedule(
   const subscriptionId = getSubscriptionId()
   if (!subscriptionId) return { success: false, error: '購読IDが見つかりません。通知を再度有効にしてください。' }
 
-  const base = getWorkerUrl()
-  if (!base) return { success: false, error: `Worker URLが空です` }
-
   const notifications: Array<{ type: 'start' | 'end'; notifyAt: string }> = []
 
   if (config.startEnabled) {
@@ -268,29 +269,12 @@ export async function syncNotificationSchedule(
     })
   }
 
-  // まずWorkerへの疎通確認
   try {
-    await fetch(`${base}/health`, { mode: 'cors' })
-  } catch (e) {
-    return { success: false, error: `Worker疎通失敗 (${base}/health): ${e instanceof Error ? e.message : '不明'}` }
-  }
-
-  try {
-    const headers = new Headers()
-    const proKey = getProKey()
-    if (proKey) headers.set('X-Pro-Key', btoa(encodeURIComponent(proKey)))
-    headers.set('Content-Type', 'application/json')
-
-    const res = await fetch(`${base}/schedule`, {
-      method: 'POST',
-      headers,
-      mode: 'cors',
-      body: JSON.stringify({
-        subscriptionId,
-        blockId,
-        dateStr,
-        notifications,
-      }),
+    const res = await workerFetch('/schedule', {
+      subscriptionId,
+      blockId,
+      dateStr,
+      notifications,
     })
     if (!res.ok) {
       const data = await res.json().catch(() => ({})) as { error?: string }
@@ -298,7 +282,7 @@ export async function syncNotificationSchedule(
     }
     return { success: true }
   } catch (e) {
-    return { success: false, error: `スケジュール送信失敗 (${base}/schedule): ${e instanceof Error ? e.message : '不明'}` }
+    return { success: false, error: `通知スケジュール同期エラー: ${e instanceof Error ? e.message : '不明'}` }
   }
 }
 
@@ -311,10 +295,11 @@ export async function deleteNotificationSchedule(
   if (!subscriptionId) return
 
   try {
-    await workerFetch(
-      `/schedule?subscriptionId=${subscriptionId}&blockId=${blockId}&dateStr=${dateStr}`,
-      { method: 'DELETE' }
-    )
+    await workerFetch('/schedule/delete', {
+      subscriptionId,
+      blockId,
+      dateStr,
+    })
   } catch (e) {
     console.error('通知スケジュール削除エラー:', e)
   }
