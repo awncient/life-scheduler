@@ -74,7 +74,7 @@ async function workerFetch(
 
   const headers = new Headers(options.headers)
   const proKey = getProKey()
-  if (proKey) headers.set('X-Pro-Key', proKey)
+  if (proKey) headers.set('X-Pro-Key', btoa(encodeURIComponent(proKey)))
   headers.set('Content-Type', 'application/json')
 
   return fetch(`${base}${path}`, { ...options, headers })
