@@ -50,6 +50,16 @@ function generateId(): string {
   return crypto.randomUUID()
 }
 
+/** X-Pro-Keyヘッダからキーを取得（Base64+URIエンコード対応） */
+function decodeProKey(raw: string): string {
+  try {
+    return decodeURIComponent(atob(raw))
+  } catch {
+    // エンコードされていない場合はそのまま返す
+    return raw
+  }
+}
+
 // ===== Web Push（VAPID署名 + 暗号化） =====
 
 /**
@@ -169,9 +179,9 @@ async function handleValidate(request: Request, env: Env): Promise<Response> {
 
 /** POST /subscribe - Push購読登録 */
 async function handleSubscribe(request: Request, env: Env): Promise<Response> {
-  const proKey = request.headers.get('X-Pro-Key')
-  if (!proKey) return error('PROキーが必要です', 401)
-  const hash = await hashKey(proKey)
+  const rawKey = request.headers.get('X-Pro-Key')
+  if (!rawKey) return error('PROキーが必要です', 401)
+  const hash = await hashKey(decodeProKey(rawKey))
   if (hash !== env.PRO_KEY_HASH) return error('無効なキーです', 401)
 
   const body = await request.json() as {
@@ -204,9 +214,9 @@ async function handleSubscribe(request: Request, env: Env): Promise<Response> {
 
 /** POST /schedule - 通知スケジュール登録/更新 */
 async function handleSchedule(request: Request, env: Env): Promise<Response> {
-  const proKey = request.headers.get('X-Pro-Key')
-  if (!proKey) return error('PROキーが必要です', 401)
-  const hash = await hashKey(proKey)
+  const rawKey = request.headers.get('X-Pro-Key')
+  if (!rawKey) return error('PROキーが必要です', 401)
+  const hash = await hashKey(decodeProKey(rawKey))
   if (hash !== env.PRO_KEY_HASH) return error('無効なキーです', 401)
 
   const body = await request.json() as {
@@ -248,9 +258,9 @@ async function handleSchedule(request: Request, env: Env): Promise<Response> {
 
 /** DELETE /schedule - 通知スケジュール削除 */
 async function handleDeleteSchedule(request: Request, env: Env): Promise<Response> {
-  const proKey = request.headers.get('X-Pro-Key')
-  if (!proKey) return error('PROキーが必要です', 401)
-  const hash = await hashKey(proKey)
+  const rawKey = request.headers.get('X-Pro-Key')
+  if (!rawKey) return error('PROキーが必要です', 401)
+  const hash = await hashKey(decodeProKey(rawKey))
   if (hash !== env.PRO_KEY_HASH) return error('無効なキーです', 401)
 
   const url = new URL(request.url)

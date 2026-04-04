@@ -74,7 +74,7 @@ async function workerFetch(
 
   const headers = new Headers(options.headers)
   const proKey = getProKey()
-  if (proKey) headers.set('X-Pro-Key', proKey)
+  if (proKey) headers.set('X-Pro-Key', btoa(encodeURIComponent(proKey)))
   headers.set('Content-Type', 'application/json')
 
   return fetch(`${base}${path}`, { ...options, headers })
@@ -160,25 +160,19 @@ export async function registerPushSubscription(): Promise<{ success: boolean; er
     }
 
     const subJSON = subscription.toJSON()
-    const body = JSON.stringify({
-      endpoint: subJSON.endpoint,
-      keys: subJSON.keys,
-    })
 
     // Worker に登録
     let res: Response
     try {
-      const url = `${getWorkerUrl()}/subscribe`
-      res = await fetch(url, {
+      res = await workerFetch('/subscribe', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-Pro-Key': getProKey(),
-        },
-        body,
+        body: JSON.stringify({
+          endpoint: subJSON.endpoint,
+          keys: subJSON.keys,
+        }),
       })
     } catch (e) {
-      return { success: false, error: `Workerへの送信で失敗: ${e instanceof Error ? e.message : '不明'} / URL: ${getWorkerUrl()}/subscribe` }
+      return { success: false, error: `Workerへの送信で失敗: ${e instanceof Error ? e.message : '不明'}` }
     }
 
     const data = await res.json() as { subscriptionId?: string; error?: string }
