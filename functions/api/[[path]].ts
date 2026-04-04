@@ -25,18 +25,32 @@ export const onRequest: PagesFunction<Env> = async (context) => {
   const path = '/' + pathSegments.join('/')
   const targetUrl = workerUrl.replace(/\/$/, '') + path
 
-  // リクエストをそのまま転送
+  // リクエストをそのまま転送（Hostヘッダーは除外）
+  const proxyHeaders = new Headers(request.headers)
+  proxyHeaders.delete('host')
+
   const proxyRequest = new Request(targetUrl, {
     method: request.method,
-    headers: request.headers,
+    headers: proxyHeaders,
     body: request.method !== 'GET' && request.method !== 'HEAD' ? request.body : null,
   })
 
-  const response = await fetch(proxyRequest)
+  try {
+    const response = await fetch(proxyRequest)
 
-  // レスポンスヘッダーをコピー（CORS不要 - same-originのため）
-  return new Response(response.body, {
-    status: response.status,
-    headers: response.headers,
-  })
+    // レスポンスヘッダーをコピー（CORS不要 - same-originのため）
+    return new Response(response.body, {
+      status: response.status,
+      headers: response.headers,
+    })
+  } catch (e) {
+    return new Response(JSON.stringify({
+      error: 'Proxy fetch failed',
+      detail: e instanceof Error ? e.message : String(e),
+      targetUrl,
+    }), {
+      status: 502,
+      headers: { 'Content-Type': 'application/json' },
+    })
+  }
 }
