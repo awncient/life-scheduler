@@ -125,7 +125,12 @@ export async function registerPushSubscription(): Promise<{ success: boolean; er
     }
 
     // 通知の許可を取得
-    const permission = await Notification.requestPermission()
+    let permission: NotificationPermission
+    try {
+      permission = await Notification.requestPermission()
+    } catch (e) {
+      return { success: false, error: `通知許可の取得で失敗: ${e instanceof Error ? e.message : '不明'}` }
+    }
     if (permission !== 'granted') {
       return { success: false, error: '通知の許可が必要です。ブラウザの設定から許可してください。' }
     }
@@ -136,24 +141,39 @@ export async function registerPushSubscription(): Promise<{ success: boolean; er
     }
 
     // Service Worker登録を取得
-    const registration = await navigator.serviceWorker.ready
+    let registration: ServiceWorkerRegistration
+    try {
+      registration = await navigator.serviceWorker.ready
+    } catch (e) {
+      return { success: false, error: `Service Worker取得で失敗: ${e instanceof Error ? e.message : '不明'}` }
+    }
 
     // Push購読を作成
-    const subscription = await registration.pushManager.subscribe({
-      userVisibleOnly: true,
-      applicationServerKey: urlBase64ToUint8Array(vapidKey).buffer as ArrayBuffer,
-    })
+    let subscription: PushSubscription
+    try {
+      subscription = await registration.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: urlBase64ToUint8Array(vapidKey).buffer as ArrayBuffer,
+      })
+    } catch (e) {
+      return { success: false, error: `Push購読の作成で失敗: ${e instanceof Error ? e.message : '不明'}` }
+    }
 
     const subJSON = subscription.toJSON()
 
     // Worker に登録
-    const res = await workerFetch('/subscribe', {
-      method: 'POST',
-      body: JSON.stringify({
-        endpoint: subJSON.endpoint,
-        keys: subJSON.keys,
-      }),
-    })
+    let res: Response
+    try {
+      res = await workerFetch('/subscribe', {
+        method: 'POST',
+        body: JSON.stringify({
+          endpoint: subJSON.endpoint,
+          keys: subJSON.keys,
+        }),
+      })
+    } catch (e) {
+      return { success: false, error: `Workerへの送信で失敗: ${e instanceof Error ? e.message : '不明'}` }
+    }
 
     const data = await res.json() as { subscriptionId?: string; error?: string }
 
@@ -164,7 +184,7 @@ export async function registerPushSubscription(): Promise<{ success: boolean; er
 
     return { success: false, error: data.error || '登録に失敗しました' }
   } catch (e) {
-    return { success: false, error: `エラー: ${e instanceof Error ? `${e.name}: ${e.message}` : '不明'}` }
+    return { success: false, error: `予期しないエラー: ${e instanceof Error ? `${e.name}: ${e.message}` : '不明'}` }
   }
 }
 
