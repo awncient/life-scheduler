@@ -3,6 +3,10 @@ declare const self: ServiceWorkerGlobalScope
 
 import { precacheAndRoute } from 'workbox-precaching'
 
+// 新しいService Workerを即座に有効化（古いキャッシュに留まる問題を防ぐ）
+self.addEventListener('install', () => self.skipWaiting())
+self.addEventListener('activate', (event) => event.waitUntil(self.clients.claim()))
+
 // Workboxのプリキャッシュ
 precacheAndRoute(self.__WB_MANIFEST)
 
