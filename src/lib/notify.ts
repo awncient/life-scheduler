@@ -9,8 +9,9 @@
 
 const STORAGE_PREFIX = 'daylog:notify'
 
-// Worker APIのベースURL（ビルド時に埋め込み）
-const WORKER_BASE_URL = (import.meta.env.VITE_WORKER_URL || '').replace(/\/$/, '')
+// Worker APIのベースURL
+// same-originプロキシ経由（/api/*）で通信し、cross-origin問題を回避
+const WORKER_BASE_URL = '/api'
 
 const PRO_KEY_KEY = `${STORAGE_PREFIX}:proKey`
 const VALIDATED_KEY = `${STORAGE_PREFIX}:validated`
