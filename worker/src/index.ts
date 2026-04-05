@@ -138,6 +138,7 @@ async function createVapidJwt(
   const payload = base64UrlEncode(new TextEncoder().encode(JSON.stringify({
     aud: audience,
     exp: expiration,
+    iat: Math.floor(Date.now() / 1000),
     sub: subject,
   })))
 
@@ -565,7 +566,26 @@ export default {
 
       // Health check（バージョン確認用）
       if (path === '/health') {
-        return json({ status: 'ok', version: '2024-04-04-v3' })
+        return json({ status: 'ok', version: '2024-04-05-v4' })
+      }
+
+      // デバッグ用: VAPID JWT の中身を確認
+      if (path === '/debug/jwt' && request.method === 'GET') {
+        const rawKey = request.headers.get('X-Pro-Key')
+        if (!rawKey) return error('PROキーが必要です', 401)
+        const h = await hashKey(decodeProKey(rawKey))
+        if (h !== env.PRO_KEY_HASH) return error('無効なキーです', 401)
+
+        const testAudience = 'https://web.push.apple.com'
+        const exp = Math.floor(Date.now() / 1000) + 12 * 60 * 60
+        const iat = Math.floor(Date.now() / 1000)
+        return json({
+          jwtClaims: { aud: testAudience, exp, iat, sub: env.VAPID_SUBJECT },
+          vapidSubject: env.VAPID_SUBJECT,
+          vapidSubjectLength: env.VAPID_SUBJECT.length,
+          vapidSubjectChars: Array.from(env.VAPID_SUBJECT).map(c => c.charCodeAt(0)),
+          vapidPublicKeyLength: env.VAPID_PUBLIC_KEY.length,
+        })
       }
 
       // デバッグ用: DB状態確認（PROキー必須）
