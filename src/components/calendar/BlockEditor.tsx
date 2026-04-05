@@ -372,12 +372,12 @@ export function BlockEditor({
 
           {/* 通知設定（PRO） */}
           {proReady && side === 'ideal' && (
-            <div style={{ marginTop: '1.5rem' }} className="space-y-5">
+            <div style={{ marginTop: '1.5rem', marginBottom: '0.5rem' }}>
               <div className="flex items-center gap-2 text-xs font-medium text-slate-600">
                 <Bell className="h-3.5 w-3.5" />
                 通知設定
               </div>
-              <div className="flex items-center justify-between" style={{ paddingLeft: '1em' }}>
+              <div className="flex items-center justify-between" style={{ paddingLeft: '1em', marginTop: '0.75rem' }}>
                 <label className="text-sm text-slate-700">開始前に通知</label>
                 <div className="flex items-center gap-2">
                   <select
@@ -399,7 +399,7 @@ export function BlockEditor({
                   </button>
                 </div>
               </div>
-              <div style={{ marginTop: '1rem', paddingLeft: '1em' }} className="flex items-center justify-between">
+              <div style={{ marginTop: '0.75rem', paddingLeft: '1em' }} className="flex items-center justify-between">
                 <label className="text-sm text-slate-700">終了前に通知</label>
                 <div className="flex items-center gap-2">
                   <select
