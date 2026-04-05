@@ -134,12 +134,16 @@ async function createVapidJwt(
   publicKeyBase64: string,
   expiration: number
 ): Promise<string> {
+  // VAPID仕様: subはmailto:またはhttps: URLでなければならない
+  const sub = subject.startsWith('mailto:') || subject.startsWith('https:')
+    ? subject
+    : `mailto:${subject}`
   const header = base64UrlEncode(new TextEncoder().encode(JSON.stringify({ typ: 'JWT', alg: 'ES256' })))
   const payload = base64UrlEncode(new TextEncoder().encode(JSON.stringify({
     aud: audience,
     exp: expiration,
     iat: Math.floor(Date.now() / 1000),
-    sub: subject,
+    sub,
   })))
 
   const signingInput = `${header}.${payload}`
