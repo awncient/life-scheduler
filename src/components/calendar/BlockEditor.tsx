@@ -372,7 +372,7 @@ export function BlockEditor({
 
           {/* 通知設定（PRO） */}
           {proReady && side === 'ideal' && (
-            <div className="mt-4 border border-slate-200 rounded-lg p-3 space-y-4">
+            <div className="mt-6 border border-slate-200 rounded-lg p-3 space-y-5">
               <div className="flex items-center gap-2 text-xs font-medium text-slate-600">
                 <Bell className="h-3.5 w-3.5" />
                 通知設定
@@ -431,7 +431,7 @@ export function BlockEditor({
           {isEdit && side === 'ideal' && onCopyToActual && (
             <Button
               variant="outline"
-              className="w-full gap-2 mt-4"
+              className="w-full gap-2 mt-6"
               onClick={handleCopyToActual}
             >
               <Copy className="h-4 w-4" />
