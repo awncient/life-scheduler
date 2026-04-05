@@ -372,7 +372,7 @@ export function BlockEditor({
 
           {/* 通知設定（PRO） */}
           {proReady && side === 'ideal' && (
-            <div style={{ marginTop: '1.5rem' }}>
+            <div style={{ marginTop: '1.5rem', marginBottom: '0.75rem' }}>
               <div className="flex items-center gap-2 text-xs font-medium text-slate-600">
                 <Bell className="h-3.5 w-3.5" />
                 通知設定
