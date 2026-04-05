@@ -278,16 +278,17 @@ async function hkdfExpand(prk: Uint8Array, info: Uint8Array, length: number): Pr
 
 /** Push送信結果 */
 type PushResult = 'ok' | 'gone' | 'error'
+type PushResultDetail = { result: PushResult; status?: number; body?: string; error?: string }
 
-async function sendPushNotification(
+async function sendPushNotificationDetailed(
   subscription: { endpoint: string; p256dh: string; auth: string },
   payload: string,
   env: Env
-): Promise<PushResult> {
+): Promise<PushResultDetail> {
   try {
     const url = new URL(subscription.endpoint)
     const audience = `${url.protocol}//${url.host}`
-    const expiration = Math.floor(Date.now() / 1000) + 12 * 60 * 60 // 12時間
+    const expiration = Math.floor(Date.now() / 1000) + 12 * 60 * 60
 
     const jwt = await createVapidJwt(
       audience,
@@ -297,7 +298,6 @@ async function sendPushNotification(
       expiration
     )
 
-    // RFC 8291 に準拠してペイロードを暗号化
     const { encrypted } = await encryptPayload(
       payload,
       subscription.p256dh,
@@ -316,24 +316,30 @@ async function sendPushNotification(
       body: encrypted,
     })
 
-    // 410/404 = 購読が明示的に無効化された
+    const respBody = await response.text().catch(() => '')
+
     if (response.status === 410 || response.status === 404) {
-      console.log(`Push subscription gone (${response.status}): ${subscription.endpoint.substring(0, 60)}`)
-      return 'gone'
+      return { result: 'gone', status: response.status, body: respBody }
     }
-
     if (response.ok) {
-      return 'ok'
+      return { result: 'ok', status: response.status }
     }
 
-    // その他のエラー（403, 400等）はログに記録するが購読は削除しない
-    const body = await response.text().catch(() => '')
-    console.error(`Push send failed (${response.status}): ${subscription.endpoint.substring(0, 60)} - ${body.substring(0, 200)}`)
-    return 'error'
+    console.error(`Push send failed (${response.status}): ${subscription.endpoint.substring(0, 60)} - ${respBody.substring(0, 200)}`)
+    return { result: 'error', status: response.status, body: respBody.substring(0, 500) }
   } catch (e) {
     console.error('Push send exception:', e)
-    return 'error'
+    return { result: 'error', error: e instanceof Error ? e.message : String(e) }
   }
+}
+
+async function sendPushNotification(
+  subscription: { endpoint: string; p256dh: string; auth: string },
+  payload: string,
+  env: Env
+): Promise<PushResult> {
+  const detail = await sendPushNotificationDetailed(subscription, payload, env)
+  return detail.result
 }
 
 // ===== ルートハンドラー =====
@@ -596,7 +602,7 @@ export default {
         const results = []
         for (const sub of subs.results) {
           try {
-            const result = await sendPushNotification(
+            const detail = await sendPushNotificationDetailed(
               {
                 endpoint: sub.endpoint as string,
                 p256dh: sub.p256dh as string,
@@ -605,9 +611,9 @@ export default {
               testPayload,
               env
             )
-            results.push({ id: sub.id, endpoint: (sub.endpoint as string).substring(0, 60) + '...', result })
+            results.push({ id: sub.id, endpoint: (sub.endpoint as string).substring(0, 60) + '...', ...detail })
           } catch (e) {
-            results.push({ id: sub.id, endpoint: (sub.endpoint as string).substring(0, 60) + '...', success: false, error: e instanceof Error ? e.message : '不明' })
+            results.push({ id: sub.id, endpoint: (sub.endpoint as string).substring(0, 60) + '...', result: 'error', error: e instanceof Error ? e.message : '不明' })
           }
         }
         return json({ results })
