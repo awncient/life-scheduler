@@ -399,7 +399,7 @@ export function BlockEditor({
                   </button>
                 </div>
               </div>
-              <div className="flex items-center justify-between">
+              <div style={{ marginTop: '1rem' }} className="flex items-center justify-between">
                 <label className="text-sm text-slate-700">終了前に通知</label>
                 <div className="flex items-center gap-2">
                   <select
