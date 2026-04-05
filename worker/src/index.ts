@@ -276,11 +276,14 @@ async function hkdfExpand(prk: Uint8Array, info: Uint8Array, length: number): Pr
   return output.slice(0, length)
 }
 
+/** Push送信結果 */
+type PushResult = 'ok' | 'gone' | 'error'
+
 async function sendPushNotification(
   subscription: { endpoint: string; p256dh: string; auth: string },
   payload: string,
   env: Env
-): Promise<boolean> {
+): Promise<PushResult> {
   try {
     const url = new URL(subscription.endpoint)
     const audience = `${url.protocol}//${url.host}`
@@ -313,14 +316,23 @@ async function sendPushNotification(
       body: encrypted,
     })
 
+    // 410/404 = 購読が明示的に無効化された
     if (response.status === 410 || response.status === 404) {
-      return false
+      console.log(`Push subscription gone (${response.status}): ${subscription.endpoint.substring(0, 60)}`)
+      return 'gone'
     }
 
-    return response.ok
+    if (response.ok) {
+      return 'ok'
+    }
+
+    // その他のエラー（403, 400等）はログに記録するが購読は削除しない
+    const body = await response.text().catch(() => '')
+    console.error(`Push send failed (${response.status}): ${subscription.endpoint.substring(0, 60)} - ${body.substring(0, 200)}`)
+    return 'error'
   } catch (e) {
-    console.error('Push send failed:', e)
-    return false
+    console.error('Push send exception:', e)
+    return 'error'
   }
 }
 
@@ -452,7 +464,7 @@ async function handleCron(env: Env): Promise<void> {
   if (!rows.results || rows.results.length === 0) return
 
   const sentIds: string[] = []
-  const invalidSubIds: string[] = []
+  const goneSubIds: string[] = []
 
   for (const row of rows.results) {
     const payload = JSON.stringify({
@@ -461,7 +473,7 @@ async function handleCron(env: Env): Promise<void> {
       type: row.type,
     })
 
-    const success = await sendPushNotification(
+    const result = await sendPushNotification(
       {
         endpoint: row.endpoint as string,
         p256dh: row.p256dh as string,
@@ -471,11 +483,14 @@ async function handleCron(env: Env): Promise<void> {
       env
     )
 
-    if (success) {
+    if (result === 'ok') {
       sentIds.push(row.id as string)
+    } else if (result === 'gone') {
+      // 410/404のみ購読を削除（明示的に無効化された場合のみ）
+      goneSubIds.push(row.sub_id as string)
     } else {
-      // 410/404 → 購読が無効
-      invalidSubIds.push(row.sub_id as string)
+      // 'error': 一時的なエラーの可能性があるため、sent=0のままにして次回リトライ
+      console.log(`Push delivery failed for schedule ${row.id}, will retry next cron`)
     }
   }
 
@@ -487,9 +502,9 @@ async function handleCron(env: Env): Promise<void> {
     ).bind(...sentIds).run()
   }
 
-  // 無効な購読を削除（CASCADE でスケジュールも削除される）
-  if (invalidSubIds.length > 0) {
-    const unique = [...new Set(invalidSubIds)]
+  // 明示的に無効な購読のみ削除（CASCADE でスケジュールも削除される）
+  if (goneSubIds.length > 0) {
+    const unique = [...new Set(goneSubIds)]
     const placeholders = unique.map(() => '?').join(',')
     await env.DB.prepare(
       `DELETE FROM push_subscriptions WHERE id IN (${placeholders})`
@@ -581,7 +596,7 @@ export default {
         const results = []
         for (const sub of subs.results) {
           try {
-            const success = await sendPushNotification(
+            const result = await sendPushNotification(
               {
                 endpoint: sub.endpoint as string,
                 p256dh: sub.p256dh as string,
@@ -590,7 +605,7 @@ export default {
               testPayload,
               env
             )
-            results.push({ id: sub.id, endpoint: (sub.endpoint as string).substring(0, 60) + '...', success })
+            results.push({ id: sub.id, endpoint: (sub.endpoint as string).substring(0, 60) + '...', result })
           } catch (e) {
             results.push({ id: sub.id, endpoint: (sub.endpoint as string).substring(0, 60) + '...', success: false, error: e instanceof Error ? e.message : '不明' })
           }
