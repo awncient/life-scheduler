@@ -534,8 +534,8 @@ async function handleCron(env: Env): Promise<void> {
 /** 絶対にクラッシュしない安全なレスポンス生成 */
 function safeErrorResponse(e: unknown): Response {
   try {
-    const msg = e instanceof Error ? `${e.name}: ${e.message}\n${e.stack}` : String(e)
-    return new Response(JSON.stringify({ error: 'Worker exception', detail: msg }), {
+    console.error('Worker exception:', e)
+    return new Response(JSON.stringify({ error: 'Internal Server Error' }), {
       status: 500,
       headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' },
     })
@@ -568,79 +568,9 @@ export default {
         return await handleDeleteSchedule(request, env)
       }
 
-      // Health check（バージョン確認用）
+      // Health check
       if (path === '/health') {
-        return json({ status: 'ok', version: '2024-04-05-v4' })
-      }
-
-      // デバッグ用: VAPID JWT の中身を確認
-      if (path === '/debug/jwt' && request.method === 'GET') {
-        const rawKey = request.headers.get('X-Pro-Key')
-        if (!rawKey) return error('PROキーが必要です', 401)
-        const h = await hashKey(decodeProKey(rawKey))
-        if (h !== env.PRO_KEY_HASH) return error('無効なキーです', 401)
-
-        const testAudience = 'https://web.push.apple.com'
-        const exp = Math.floor(Date.now() / 1000) + 12 * 60 * 60
-        const iat = Math.floor(Date.now() / 1000)
-        return json({
-          jwtClaims: { aud: testAudience, exp, iat, sub: env.VAPID_SUBJECT },
-          vapidSubject: env.VAPID_SUBJECT,
-          vapidSubjectLength: env.VAPID_SUBJECT.length,
-          vapidSubjectChars: Array.from(env.VAPID_SUBJECT).map(c => c.charCodeAt(0)),
-          vapidPublicKeyLength: env.VAPID_PUBLIC_KEY.length,
-        })
-      }
-
-      // デバッグ用: DB状態確認（PROキー必須）
-      if (path === '/debug/status' && request.method === 'GET') {
-        const rawKey = request.headers.get('X-Pro-Key')
-        if (!rawKey) return error('PROキーが必要です', 401)
-        const hash = await hashKey(decodeProKey(rawKey))
-        if (hash !== env.PRO_KEY_HASH) return error('無効なキーです', 401)
-
-        const subs = await env.DB.prepare('SELECT id, endpoint, created_at FROM push_subscriptions').all()
-        const schedules = await env.DB.prepare('SELECT id, subscription_id, block_id, date_str, type, notify_at, sent FROM notification_schedules ORDER BY notify_at').all()
-        const now = new Date().toISOString()
-        return json({ now, subscriptions: subs.results, schedules: schedules.results })
-      }
-
-      // デバッグ用: 手動で通知送信テスト（PROキー必須、全購読に送信）
-      if (path === '/debug/test-push' && request.method === 'POST') {
-        const rawKey = request.headers.get('X-Pro-Key')
-        if (!rawKey) return error('PROキーが必要です', 401)
-        const hash = await hashKey(decodeProKey(rawKey))
-        if (hash !== env.PRO_KEY_HASH) return error('無効なキーです', 401)
-
-        const subs = await env.DB.prepare('SELECT id, endpoint, p256dh, auth FROM push_subscriptions').all()
-        if (!subs.results || subs.results.length === 0) {
-          return json({ error: '購読が見つかりません' })
-        }
-
-        const testPayload = JSON.stringify({
-          blockId: 'test',
-          dateStr: new Date().toISOString().split('T')[0],
-          type: 'start',
-        })
-
-        const results = []
-        for (const sub of subs.results) {
-          try {
-            const detail = await sendPushNotificationDetailed(
-              {
-                endpoint: sub.endpoint as string,
-                p256dh: sub.p256dh as string,
-                auth: sub.auth as string,
-              },
-              testPayload,
-              env
-            )
-            results.push({ id: sub.id, endpoint: (sub.endpoint as string).substring(0, 60) + '...', ...detail })
-          } catch (e) {
-            results.push({ id: sub.id, endpoint: (sub.endpoint as string).substring(0, 60) + '...', result: 'error', error: e instanceof Error ? e.message : '不明' })
-          }
-        }
-        return json({ results })
+        return json({ status: 'ok' })
       }
 
       return error('Not Found', 404)
