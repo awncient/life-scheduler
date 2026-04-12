@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import type { TimeBlock } from '@/types'
-import { SLOT_COUNT, SLOTS_PER_HOUR, DEFAULT_SETTINGS, IDEAL_COLOR, ACTUAL_COLOR, formatDate, parseDate, getNowInTimezone, getTodayInTimezone, adjustBlocksForTimezone, getVisibleBlocksForDay } from '@/types'
+import { SLOT_COUNT, SLOTS_PER_HOUR, DEFAULT_SETTINGS, IDEAL_COLOR, ACTUAL_COLOR, formatDate, parseDate, getNowInTimezone, getTodayInTimezone, adjustBlocksForTimezone, getVisibleBlocksForDay, generateId } from '@/types'
 import { useBlocks } from '@/hooks/useBlocks'
 import { getSchedule, getSchedule as getStoredSchedule, saveSchedule as saveStoredSchedule, getSettings } from '@/lib/storage'
 import { usePinchZoom } from '@/hooks/usePinchZoom'
@@ -225,16 +225,54 @@ export function DayView({ date, onOpenHistory, onNavigateDate, scrollToSlot }: P
 
   const copyToActual = useCallback(
     (block: TimeBlock, newStartSlot?: number) => {
-      const start = newStartSlot ?? block.startTime
-      const duration = block.endTime - block.startTime
-      addActualBlock({
-        title: block.title,
-        startTime: start,
-        endTime: start + duration,
-        color: ACTUAL_COLOR,
-      })
+      const origStart = block._origStartTime ?? block.startTime
+      const origEnd = block._origEndTime ?? block.endTime
+      const blockStartDate = block.startDate || date
+      const blockEndDate = block.endDate
+      const isMultiDay = blockEndDate != null && blockEndDate !== blockStartDate
+
+      if (isMultiDay) {
+        // 日跨ぎブロック: 元の日付範囲と時間を保持してコピー
+        if (blockStartDate === date) {
+          // 開始日が表示中の日 → hookでそのまま追加
+          addActualBlock({
+            title: block.title,
+            startTime: origStart,
+            endTime: origEnd,
+            color: ACTUAL_COLOR,
+            startDate: blockStartDate,
+            endDate: blockEndDate,
+          })
+        } else {
+          // 開始日が別の日 → 開始日のスケジュールに直接保存
+          const targetSchedule = getStoredSchedule(blockStartDate)
+          const tz = getSettings().timezoneOffset
+          const newBlock: TimeBlock = {
+            id: generateId(),
+            title: block.title,
+            startTime: origStart,
+            endTime: origEnd,
+            color: ACTUAL_COLOR,
+            startDate: blockStartDate,
+            endDate: blockEndDate,
+            timezoneOffset: tz,
+          }
+          targetSchedule.actualBlocks = [...targetSchedule.actualBlocks, newBlock]
+          saveStoredSchedule(targetSchedule)
+          refresh()
+        }
+      } else {
+        const start = newStartSlot ?? block.startTime
+        const duration = block.endTime - block.startTime
+        addActualBlock({
+          title: block.title,
+          startTime: start,
+          endTime: start + duration,
+          color: ACTUAL_COLOR,
+        })
+      }
     },
-    [addActualBlock],
+    [addActualBlock, date, refresh],
   )
 
   const handleSave = async (data: Omit<TimeBlock, 'id'> & { endDate?: string }, notifyConfig?: NotifyConfig) => {
