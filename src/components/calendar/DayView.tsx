@@ -201,26 +201,105 @@ export function DayView({ date, onOpenHistory, onNavigateDate, scrollToSlot }: P
 
   const handleBlockDragEnd = useCallback(
     (side: 'ideal' | 'actual', block: TimeBlock, newStartSlot: number) => {
-      if (side === 'ideal') {
-        moveIdealBlock(block.id, newStartSlot)
-        // 通知スケジュールも更新
-        if (isNotificationReady()) {
-          const duration = block.endTime - block.startTime
-          const newEndSlot = Math.min(newStartSlot + duration, SLOT_COUNT)
-          const blockDate = block._sourceScheduleDate || date
-          const cfg = getBlockNotifyConfig(block.id, blockDate)
-          if (cfg) {
-            syncNotificationSchedule(block.id, blockDate, newStartSlot, newEndSlot, cfg, timezoneOffset)
-              .then(result => {
-                if (!result.success) alert(`通知設定エラー: ${result.error}`)
-              })
-          }
+      const origStart = block._origStartTime ?? block.startTime
+      const origEnd = block._origEndTime ?? block.endTime
+      const blockStartDate = block.startDate || date
+      const blockEndDate = block.endDate
+      const isMultiDay = blockEndDate != null && blockEndDate !== blockStartDate
+      const sourceDate = block._sourceScheduleDate || date
+      const delta = newStartSlot - block.startTime
+
+      let finalStartTime: number
+      let finalEndTime: number
+      let finalEndDate: string | undefined
+
+      if (isMultiDay) {
+        // 日跨ぎブロック: 合計duration を維持して移動
+        const totalDuration = (SLOT_COUNT - origStart) + origEnd
+        const newOrigStart = origStart + delta
+
+        if (newOrigStart < 0 || newOrigStart >= SLOT_COUNT) return
+
+        if (newOrigStart + totalDuration <= SLOT_COUNT) {
+          // 24時以内に収まる → 単日ブロックに変換
+          finalStartTime = newOrigStart
+          finalEndTime = newOrigStart + totalDuration
+          finalEndDate = undefined
+        } else {
+          // まだ日を跨ぐ
+          finalStartTime = newOrigStart
+          finalEndTime = (newOrigStart + totalDuration) - SLOT_COUNT
+          finalEndDate = blockEndDate
+        }
+
+        const updates: Partial<TimeBlock> = {
+          startTime: finalStartTime,
+          endTime: finalEndTime,
+          endDate: finalEndDate,
+        }
+
+        if (sourceDate === date) {
+          if (side === 'ideal') updateIdealBlock(block.id, updates)
+          else updateActualBlock(block.id, updates)
+        } else {
+          const key = side === 'ideal' ? 'idealBlocks' : 'actualBlocks' as const
+          const sourceSchedule = getStoredSchedule(sourceDate)
+          sourceSchedule[key] = sourceSchedule[key].map((b: TimeBlock) =>
+            b.id === block.id ? { ...b, ...updates } : b
+          )
+          saveStoredSchedule(sourceSchedule)
+          refresh()
         }
       } else {
-        moveActualBlock(block.id, newStartSlot)
+        // 単日ブロック
+        const dur = block.endTime - block.startTime
+        const newEnd = newStartSlot + dur
+
+        if (newEnd > SLOT_COUNT) {
+          // 24時を超えた → 日跨ぎブロックに変換
+          finalStartTime = newStartSlot
+          finalEndTime = newEnd - SLOT_COUNT
+          finalEndDate = offsetDateStr(blockStartDate, 1)
+
+          if (side === 'ideal') {
+            updateIdealBlock(block.id, {
+              startTime: finalStartTime,
+              endTime: finalEndTime,
+              startDate: blockStartDate,
+              endDate: finalEndDate,
+            })
+          } else {
+            updateActualBlock(block.id, {
+              startTime: finalStartTime,
+              endTime: finalEndTime,
+              startDate: blockStartDate,
+              endDate: finalEndDate,
+            })
+          }
+        } else {
+          // 通常の単日移動
+          finalStartTime = newStartSlot
+          finalEndTime = newEnd
+          finalEndDate = undefined
+
+          if (side === 'ideal') moveIdealBlock(block.id, newStartSlot)
+          else moveActualBlock(block.id, newStartSlot)
+        }
+      }
+
+      // 通知スケジュールの更新
+      if (side === 'ideal' && isNotificationReady()) {
+        const blockDate = sourceDate
+        const cfg = getBlockNotifyConfig(block.id, blockDate)
+        if (cfg) {
+          syncNotificationSchedule(block.id, blockDate, finalStartTime, finalEndTime, cfg, timezoneOffset)
+            .then(result => {
+              if (!result.success) alert(`通知設定エラー: ${result.error}`)
+            })
+        }
       }
     },
-    [moveIdealBlock, moveActualBlock, date, timezoneOffset],
+    [moveIdealBlock, moveActualBlock, updateIdealBlock, updateActualBlock, date, timezoneOffset, refresh],
   )
 
   const copyToActual = useCallback(
@@ -232,29 +311,51 @@ export function DayView({ date, onOpenHistory, onNavigateDate, scrollToSlot }: P
       const isMultiDay = blockEndDate != null && blockEndDate !== blockStartDate
 
       if (isMultiDay) {
-        // 日跨ぎブロック: 元の日付範囲と時間を保持してコピー
+        // 日跨ぎブロック: 合計durationを維持してコピー
+        const totalDuration = (SLOT_COUNT - origStart) + origEnd
+        let copyStart: number
+        let copyEnd: number
+        let copyEndDate: string | undefined
+
+        if (newStartSlot != null) {
+          // ドラッグコピー: 時間調整あり
+          const delta = newStartSlot - block.startTime
+          copyStart = Math.max(0, Math.min(SLOT_COUNT - 1, origStart + delta))
+
+          if (copyStart + totalDuration <= SLOT_COUNT) {
+            copyEnd = copyStart + totalDuration
+            copyEndDate = undefined
+          } else {
+            copyEnd = (copyStart + totalDuration) - SLOT_COUNT
+            copyEndDate = blockEndDate
+          }
+        } else {
+          // エディタからのコピー: 同じ時間
+          copyStart = origStart
+          copyEnd = origEnd
+          copyEndDate = blockEndDate
+        }
+
         if (blockStartDate === date) {
-          // 開始日が表示中の日 → hookでそのまま追加
           addActualBlock({
             title: block.title,
-            startTime: origStart,
-            endTime: origEnd,
+            startTime: copyStart,
+            endTime: copyEnd,
             color: ACTUAL_COLOR,
             startDate: blockStartDate,
-            endDate: blockEndDate,
+            endDate: copyEndDate,
           })
         } else {
-          // 開始日が別の日 → 開始日のスケジュールに直接保存
           const targetSchedule = getStoredSchedule(blockStartDate)
           const tz = getSettings().timezoneOffset
           const newBlock: TimeBlock = {
             id: generateId(),
             title: block.title,
-            startTime: origStart,
-            endTime: origEnd,
+            startTime: copyStart,
+            endTime: copyEnd,
             color: ACTUAL_COLOR,
             startDate: blockStartDate,
-            endDate: blockEndDate,
+            endDate: copyEndDate,
             timezoneOffset: tz,
           }
           targetSchedule.actualBlocks = [...targetSchedule.actualBlocks, newBlock]
@@ -262,14 +363,29 @@ export function DayView({ date, onOpenHistory, onNavigateDate, scrollToSlot }: P
           refresh()
         }
       } else {
+        // 単日ブロック
         const start = newStartSlot ?? block.startTime
         const duration = block.endTime - block.startTime
-        addActualBlock({
-          title: block.title,
-          startTime: start,
-          endTime: start + duration,
-          color: ACTUAL_COLOR,
-        })
+        const end = start + duration
+
+        if (end > SLOT_COUNT) {
+          // 24時超過 → 日跨ぎブロックとしてコピー
+          addActualBlock({
+            title: block.title,
+            startTime: start,
+            endTime: end - SLOT_COUNT,
+            color: ACTUAL_COLOR,
+            startDate: date,
+            endDate: offsetDateStr(date, 1),
+          })
+        } else {
+          addActualBlock({
+            title: block.title,
+            startTime: start,
+            endTime: end,
+            color: ACTUAL_COLOR,
+          })
+        }
       }
     },
     [addActualBlock, date, refresh],
