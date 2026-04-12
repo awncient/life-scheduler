@@ -117,13 +117,16 @@ export function TimeBlockItem({ block, slotHeight, onTap, onDragEnd, onCopyToAct
           const slotDelta = Math.round(dragOffsetRef.current / slotHeight)
           const snappedDelta = Math.round(slotDelta / SLOTS_PER_15MIN) * SLOTS_PER_15MIN
           const dur = b.endTime - b.startTime
-          const newStart = Math.max(0, Math.min(SLOT_COUNT - dur, b.startTime + snappedDelta))
+          // 最低15分(または全体)を当日内に残しつつ、24時超過を許容
+          const minVisible = Math.min(dur, SLOTS_PER_15MIN)
+          const newStart = Math.max(0, Math.min(SLOT_COUNT - minVisible, b.startTime + snappedDelta))
           onCopyRef.current(b, newStart)
         } else if (onDragEndRef.current) {
           const slotDelta = Math.round(dragOffsetRef.current / slotHeight)
           const snappedDelta = Math.round(slotDelta / SLOTS_PER_15MIN) * SLOTS_PER_15MIN
           const dur = b.endTime - b.startTime
-          const newStart = Math.max(0, Math.min(SLOT_COUNT - dur, b.startTime + snappedDelta))
+          const minVisible = Math.min(dur, SLOTS_PER_15MIN)
+          const newStart = Math.max(0, Math.min(SLOT_COUNT - minVisible, b.startTime + snappedDelta))
           onDragEndRef.current(b, newStart)
         }
       } else if (!fingerMoved.current && !dragActiveRef.current) {
