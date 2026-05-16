@@ -197,6 +197,7 @@ export function BlockEditor({
         startTime: start,
         endTime: end,
         color,
+        startDate,
         ...(isMultiDay ? { endDate } : {}),
       }, notifyConfig)
     }

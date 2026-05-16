@@ -393,25 +393,37 @@ export function DayView({ date, onOpenHistory, onNavigateDate, scrollToSlot }: P
 
   const handleSave = async (data: Omit<TimeBlock, 'id'> & { endDate?: string }, notifyConfig?: NotifyConfig) => {
     const color = editorSide === 'ideal' ? IDEAL_COLOR : ACTUAL_COLOR
+    const blockStartDate = data.startDate || date
     const blockData = {
       ...data,
       color,
-      startDate: date,
+      startDate: blockStartDate,
       endDate: data.endDate,
     }
 
     let newBlock: TimeBlock | undefined
-    if (editorSide === 'ideal') {
-      newBlock = addIdealBlock(blockData)
+    if (blockStartDate !== date) {
+      // 開始日が表示中の日と異なる → 開始日のスケジュールに直接保存
+      const targetSchedule = getStoredSchedule(blockStartDate)
+      const tz = getSettings().timezoneOffset
+      const key = editorSide === 'ideal' ? 'idealBlocks' : 'actualBlocks' as const
+      newBlock = { ...blockData, id: generateId(), timezoneOffset: tz }
+      targetSchedule[key] = [...targetSchedule[key], newBlock]
+      saveStoredSchedule(targetSchedule)
+      refresh()
     } else {
-      newBlock = addActualBlock(blockData)
+      if (editorSide === 'ideal') {
+        newBlock = addIdealBlock(blockData)
+      } else {
+        newBlock = addActualBlock(blockData)
+      }
     }
 
     // 通知スケジュールの同期
     if (notifyConfig && newBlock && isNotificationReady()) {
-      saveBlockNotifyConfig(newBlock.id, date, notifyConfig)
+      saveBlockNotifyConfig(newBlock.id, blockStartDate, notifyConfig)
       const result = await syncNotificationSchedule(
-        newBlock.id, date, data.startTime, data.endTime, notifyConfig, timezoneOffset
+        newBlock.id, blockStartDate, data.startTime, data.endTime, notifyConfig, timezoneOffset
       )
       if (!result.success) alert(`通知設定エラー: ${result.error}`)
     }
