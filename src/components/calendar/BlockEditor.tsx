@@ -135,9 +135,9 @@ export function BlockEditor({
             setEndNotify(cfg.endEnabled)
             setEndMinBefore(cfg.endMinutesBefore)
           } else {
-            setStartNotify(false)
+            setStartNotify(proReady)
             setStartMinBefore(5)
-            setEndNotify(false)
+            setEndNotify(proReady)
             setEndMinBefore(5)
           }
         }
@@ -153,9 +153,9 @@ export function BlockEditor({
         setStartMinutes(sm)
         setEndHours(eh)
         setEndMinutes(em)
-        setStartNotify(false)
+        setStartNotify(proReady)
         setStartMinBefore(5)
-        setEndNotify(false)
+        setEndNotify(proReady)
         setEndMinBefore(5)
       }
       setActivePicker(null)
