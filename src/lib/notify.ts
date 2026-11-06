@@ -311,6 +311,51 @@ export async function syncNotificationSchedule(
   }
 }
 
+const ACTUAL_CLEANUP_FLAG = `${STORAGE_PREFIX}:actualCleanupDone`
+let actualCleanupRunning = false
+
+/**
+ * 実際欄のブロックに誤って登録された通知を一度だけ掃除する。
+ * 通知は理想欄のブロック専用だが、「通知をデフォルトON」にした変更が実際欄にも効いてしまい、
+ * 実際欄のブロックの通知がサーバーに登録されていた。
+ * ローカルの通知設定のうち、対応するブロックが実際欄にあるものだけをサーバーとローカルから削除する。
+ * @param isActualBlock その日付のスケジュールの実際欄にblockIdのブロックがあるか
+ */
+export async function cleanupActualBlockNotifications(
+  isActualBlock: (dateStr: string, blockId: string) => boolean,
+): Promise<void> {
+  if (actualCleanupRunning) return
+  if (localStorage.getItem(ACTUAL_CLEANUP_FLAG) === 'true') return
+  if (!isNotificationReady() || !navigator.onLine) return
+  actualCleanupRunning = true
+  try {
+    await runActualCleanup(isActualBlock)
+  } finally {
+    actualCleanupRunning = false
+  }
+}
+
+async function runActualCleanup(
+  isActualBlock: (dateStr: string, blockId: string) => boolean,
+): Promise<void> {
+  const configPrefix = `${NOTIFY_CONFIG_PREFIX}:`
+  const targets: Array<{ dateStr: string; blockId: string }> = []
+  for (let i = 0; i < localStorage.length; i++) {
+    const k = localStorage.key(i)
+    if (!k || !k.startsWith(configPrefix)) continue
+    // キー形式: daylog:notify:config:{YYYY-MM-DD}:{blockId}
+    const [dateStr, blockId] = k.slice(configPrefix.length).split(':')
+    if (dateStr && blockId && isActualBlock(dateStr, blockId)) {
+      targets.push({ dateStr, blockId })
+    }
+  }
+
+  for (const { dateStr, blockId } of targets) {
+    await deleteNotificationSchedule(blockId, dateStr)
+  }
+  localStorage.setItem(ACTUAL_CLEANUP_FLAG, 'true')
+}
+
 /** ブロック削除時に通知スケジュールも削除 */
 export async function deleteNotificationSchedule(
   blockId: string,

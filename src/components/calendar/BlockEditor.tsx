@@ -135,9 +135,10 @@ export function BlockEditor({
             setEndNotify(cfg.endEnabled)
             setEndMinBefore(cfg.endMinutesBefore)
           } else {
-            setStartNotify(proReady)
+            // 既存ブロックで通知未設定のものは、開いて保存しただけで勝手に通知が付かないようオフのまま
+            setStartNotify(false)
             setStartMinBefore(5)
-            setEndNotify(proReady)
+            setEndNotify(false)
             setEndMinBefore(5)
           }
         }
@@ -178,7 +179,8 @@ export function BlockEditor({
     const start = timeToSlot(startTimeStr)
     const end = timeToSlot(endTimeStr)
 
-    const notifyConfig: NotifyConfig | undefined = proReady && (startNotify || endNotify)
+    // 通知は理想欄のブロックだけ（実際欄は通知設定UIが無いので、デフォルトONでも送らない）
+    const notifyConfig: NotifyConfig | undefined = proReady && side === 'ideal' && (startNotify || endNotify)
       ? { startEnabled: startNotify, startMinutesBefore: startMinBefore, endEnabled: endNotify, endMinutesBefore: endMinBefore }
       : undefined
 

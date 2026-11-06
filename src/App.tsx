@@ -8,6 +8,7 @@ import { VersionHistoryView } from '@/components/calendar/VersionHistory'
 import { TodoView } from '@/components/todo/TodoView'
 import { SettingsView } from '@/components/settings/SettingsView'
 import { DiaryView } from '@/components/diary/DiaryView'
+import { cleanupActualBlockNotifications } from '@/lib/notify'
 import { ViewSwitchButton } from '@/components/layout/ViewSwitchButton'
 
 type AppMode = 'calendar' | 'todo' | 'settings'
@@ -20,6 +21,13 @@ export default function App() {
   const [scrollToSlot, setScrollToSlot] = useState<number | null>(null)
 
   const [prevMode, setPrevMode] = useState<'calendar' | 'todo'>('calendar')
+
+  // 実際欄のブロックに誤って登録された通知を一度だけ掃除する
+  useEffect(() => {
+    cleanupActualBlockNotifications((dateStr, blockId) =>
+      getSchedule(dateStr).actualBlocks.some(b => b.id === blockId),
+    )
+  }, [])
 
   // Service Workerからのブロック情報リクエストに応答
   useEffect(() => {

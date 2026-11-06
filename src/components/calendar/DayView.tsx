@@ -420,7 +420,7 @@ export function DayView({ date, onOpenHistory, onNavigateDate, scrollToSlot }: P
     }
 
     // 通知スケジュールの同期
-    if (notifyConfig && newBlock && isNotificationReady()) {
+    if (notifyConfig && newBlock && editorSide === 'ideal' && isNotificationReady()) {
       saveBlockNotifyConfig(newBlock.id, blockStartDate, notifyConfig)
       const result = await syncNotificationSchedule(
         newBlock.id, blockStartDate, data.startTime, data.endTime, notifyConfig, timezoneOffset
@@ -491,8 +491,8 @@ export function DayView({ date, onOpenHistory, onNavigateDate, scrollToSlot }: P
       else deleteActualBlock(id)
     }
 
-    // 通知スケジュールも削除
-    if (isNotificationReady() && editorSide === 'ideal') {
+    // 通知スケジュールも削除（実際欄でも、誤って登録された通知が残らないよう両側で実行）
+    if (isNotificationReady()) {
       deleteNotificationSchedule(id, sourceDate)
     }
   }
