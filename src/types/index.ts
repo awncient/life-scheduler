@@ -21,6 +21,12 @@ export type DaySchedule = {
   actualBlocks: TimeBlock[]
 }
 
+// ===== 日記（自由記述） =====
+export type DiaryEntry = {
+  date: string    // "2026-03-11" (YYYY-MM-DD)
+  content: string
+}
+
 // ===== 理想列のバージョン管理 =====
 export type IdealSnapshot = {
   id: string
@@ -54,6 +60,7 @@ export type AppData = {
   idealSnapshots: IdealSnapshot[]
   yearlyGoals: YearlyGoal[]
   monthlyTodos: MonthlyTodo[]
+  diaries?: DiaryEntry[] // 日記追加前のエクスポートファイルには存在しない
   settings: AppSettings
 }
 

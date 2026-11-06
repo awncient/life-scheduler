@@ -15,7 +15,7 @@ import {
 } from 'lucide-react'
 
 type AppMode = 'calendar' | 'todo' | 'settings'
-type CalendarView = 'day' | 'three' | 'week'
+type CalendarView = 'day' | 'three' | 'week' | 'diary'
 
 type Props = {
   mode: AppMode
@@ -45,16 +45,21 @@ export function Header({
 
   const dateLabel = (() => {
     const d = parseDate(currentDate)
-    if (calendarView === 'day') {
+    if (calendarView === 'day' || calendarView === 'diary') {
       return `${d.getFullYear()}/${d.getMonth() + 1}/${d.getDate()}（${DAY_NAMES_JP[d.getDay()]}）`
     }
     return `${d.getFullYear()}/${d.getMonth() + 1}月`
   })()
 
   const viewCycle: CalendarView[] = ['day', 'three', 'week']
-  const viewLabels: Record<CalendarView, string> = { day: '1日', three: '3日', week: '週' }
+  const viewLabels: Record<CalendarView, string> = { day: '1日', three: '3日', week: '週', diary: '日記' }
 
   const cycleView = () => {
+    // 日記ページからはこのボタンで時系列(1日)に戻る
+    if (calendarView === 'diary') {
+      setCalendarView('day')
+      return
+    }
     const idx = viewCycle.indexOf(calendarView as CalendarView)
     const next = viewCycle[(idx + 1) % viewCycle.length]
     setCalendarView(next)

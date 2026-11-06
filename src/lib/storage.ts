@@ -1,4 +1,4 @@
-import type { DaySchedule, IdealSnapshot, YearlyGoal, MonthlyTodo, AppSettings } from '@/types'
+import type { DaySchedule, IdealSnapshot, YearlyGoal, MonthlyTodo, DiaryEntry, AppSettings } from '@/types'
 import { DEFAULT_SETTINGS } from '@/types'
 
 const PREFIX = 'daylog'
@@ -72,6 +72,21 @@ export function saveMonthlyTodo(todo: MonthlyTodo): void {
   setJSON(key('monthly-todo', `${todo.year}-${todo.month}`), todo)
 }
 
+// ===== Diary =====
+
+export function getDiary(date: string): DiaryEntry {
+  return getJSON<DiaryEntry>(key('diary', date)) ?? { date, content: '' }
+}
+
+/** 空の日記はキーごと削除する（空エントリが溜まらないように） */
+export function saveDiary(entry: DiaryEntry): void {
+  if (entry.content.trim() === '') {
+    localStorage.removeItem(key('diary', entry.date))
+    return
+  }
+  setJSON(key('diary', entry.date), entry)
+}
+
 // ===== Settings =====
 
 export function getSettings(): AppSettings {
@@ -121,6 +136,19 @@ export function getAllYearlyGoals(): YearlyGoal[] {
     }
   }
   return goals
+}
+
+export function getAllDiaries(): DiaryEntry[] {
+  const diaries: DiaryEntry[] = []
+  const diaryPrefix = key('diary') + ':'
+  for (let i = 0; i < localStorage.length; i++) {
+    const k = localStorage.key(i)
+    if (k && k.startsWith(diaryPrefix)) {
+      const d = getJSON<DiaryEntry>(k)
+      if (d) diaries.push(d)
+    }
+  }
+  return diaries.sort((a, b) => a.date.localeCompare(b.date))
 }
 
 export function getAllMonthlyTodos(): MonthlyTodo[] {
