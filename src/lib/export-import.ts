@@ -4,11 +4,13 @@ import {
   getAllSnapshots,
   getAllYearlyGoals,
   getAllMonthlyTodos,
+  getAllDiaries,
   getSettings,
   saveSchedule,
   saveSnapshots,
   saveYearlyGoal,
   saveMonthlyTodo,
+  saveDiary,
   saveSettings,
 } from './storage'
 
@@ -19,6 +21,7 @@ export function exportData(): AppData {
     idealSnapshots: getAllSnapshots(),
     yearlyGoals: getAllYearlyGoals(),
     monthlyTodos: getAllMonthlyTodos(),
+    diaries: getAllDiaries(),
     settings: getSettings(),
   }
 }
@@ -55,6 +58,9 @@ export function importData(data: AppData): void {
   }
   for (const t of data.monthlyTodos) {
     saveMonthlyTodo(t)
+  }
+  for (const d of data.diaries ?? []) {
+    saveDiary(d)
   }
   if (data.settings) {
     saveSettings(data.settings)

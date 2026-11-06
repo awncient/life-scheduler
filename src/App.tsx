@@ -7,9 +7,11 @@ import { MultiDayView } from '@/components/calendar/MultiDayView'
 import { VersionHistoryView } from '@/components/calendar/VersionHistory'
 import { TodoView } from '@/components/todo/TodoView'
 import { SettingsView } from '@/components/settings/SettingsView'
+import { DiaryView } from '@/components/diary/DiaryView'
+import { ViewSwitchButton } from '@/components/layout/ViewSwitchButton'
 
 type AppMode = 'calendar' | 'todo' | 'settings'
-type CalendarView = 'day' | 'three' | 'week' | 'history'
+type CalendarView = 'day' | 'three' | 'week' | 'history' | 'diary'
 
 export default function App() {
   const [mode, setMode] = useState<AppMode>('calendar')
@@ -112,11 +114,22 @@ export default function App() {
             onBack={() => setCalendarView('day')}
           />
         )}
+        {mode === 'calendar' && calendarView === 'diary' && (
+          <DiaryView key={currentDate} date={currentDate} />
+        )}
         {mode === 'todo' && <TodoView />}
         {mode === 'settings' && (
           <SettingsView onBack={() => setMode(prevMode)} />
         )}
       </main>
+
+      {/* 時系列（1日）⇄ 日記 の切り替えボタン */}
+      {mode === 'calendar' && (calendarView === 'day' || calendarView === 'diary') && (
+        <ViewSwitchButton
+          inDiary={calendarView === 'diary'}
+          onToggle={() => setCalendarView(calendarView === 'diary' ? 'day' : 'diary')}
+        />
+      )}
     </div>
   )
 }
