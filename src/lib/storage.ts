@@ -87,6 +87,22 @@ export function saveDiary(entry: DiaryEntry): void {
   setJSON(key('diary', entry.date), entry)
 }
 
+/** その日に日記があるか（空の日記は保存されないのでキーの有無で判定できる） */
+export function hasDiary(date: string): boolean {
+  return localStorage.getItem(key('diary', date)) !== null
+}
+
+/** 日記が書かれている日付の一覧（昇順） */
+export function getDiaryDates(): string[] {
+  const dates: string[] = []
+  const diaryPrefix = key('diary') + ':'
+  for (let i = 0; i < localStorage.length; i++) {
+    const k = localStorage.key(i)
+    if (k && k.startsWith(diaryPrefix)) dates.push(k.slice(diaryPrefix.length))
+  }
+  return dates.sort()
+}
+
 // ===== Settings =====
 
 export function getSettings(): AppSettings {

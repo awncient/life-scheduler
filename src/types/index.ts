@@ -199,6 +199,7 @@ export function getVisibleBlocksForDay(
 
 export const IDEAL_COLOR = '#34b870' // 緑（やや鮮やか、白文字映え）
 export const ACTUAL_COLOR = '#e8546a' // ローズ（やや鮮やか、白文字映え）
+export const DIARY_COLOR = '#22b8cf' // シアン（カレンダーの日記ありマーク）
 
 export const DEFAULT_SETTINGS: AppSettings = {
   zoomLevel: 5,
