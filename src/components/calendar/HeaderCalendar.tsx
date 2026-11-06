@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useMemo, useCallback } from 'react'
-import { formatDate, parseDate, getTodayInTimezone, IDEAL_COLOR, ACTUAL_COLOR } from '@/types'
-import { getSchedule, getSettings } from '@/lib/storage'
+import { formatDate, parseDate, getTodayInTimezone, IDEAL_COLOR, ACTUAL_COLOR, DIARY_COLOR } from '@/types'
+import { getSchedule, getSettings, hasDiary } from '@/lib/storage'
 
 const DAY_NAMES = ['日', '月', '火', '水', '木', '金', '土']
 
@@ -32,11 +32,12 @@ function getMonthWeeks(year: number, month: number) {
 }
 
 /** 日付にデータがあるかチェック */
-function getDayDots(dateStr: string): { hasIdeal: boolean; hasActual: boolean } {
+function getDayDots(dateStr: string): { hasIdeal: boolean; hasActual: boolean; hasDiary: boolean } {
   const schedule = getSchedule(dateStr)
   return {
     hasIdeal: schedule.idealBlocks.length > 0,
     hasActual: schedule.actualBlocks.length > 0,
+    hasDiary: hasDiary(dateStr),
   }
 }
 
@@ -111,6 +112,9 @@ function MonthGrid({
                     )}
                     {dots.hasActual && (
                       <div className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: ACTUAL_COLOR }} />
+                    )}
+                    {dots.hasDiary && (
+                      <div className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: DIARY_COLOR }} />
                     )}
                   </div>
                 )}

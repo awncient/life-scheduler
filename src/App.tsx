@@ -1,6 +1,6 @@
 import { useState, useCallback, useEffect } from 'react'
 import { formatDate, parseDate, getTodayInTimezone, slotToTime } from '@/types'
-import { getSettings, getSchedule } from '@/lib/storage'
+import { getSettings, getSchedule, getDiaryDates } from '@/lib/storage'
 import { Header } from '@/components/layout/Header'
 import { DayView } from '@/components/calendar/DayView'
 import { MultiDayView } from '@/components/calendar/MultiDayView'
@@ -57,6 +57,15 @@ export default function App() {
       return formatDate(d)
     })
   }, [calendarView])
+
+  // 日記ページの左右フリック: 前日/翌日ではなく、日記が書かれている前後の日付へ飛ぶ
+  const jumpDiary = useCallback((direction: -1 | 1) => {
+    const dates = getDiaryDates()
+    const target = direction < 0
+      ? [...dates].reverse().find(d => d < currentDate)
+      : dates.find(d => d > currentDate)
+    if (target) setCurrentDate(target)
+  }, [currentDate])
 
   return (
     <div className="flex flex-col h-[100dvh] bg-white">
@@ -115,7 +124,7 @@ export default function App() {
           />
         )}
         {mode === 'calendar' && calendarView === 'diary' && (
-          <DiaryView key={currentDate} date={currentDate} />
+          <DiaryView key={currentDate} date={currentDate} onSwipe={jumpDiary} />
         )}
         {mode === 'todo' && <TodoView />}
         {mode === 'settings' && (
